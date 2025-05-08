@@ -3,7 +3,7 @@ import { useState, useEffect } from 'react';
 import Head from 'next/head';
 import Link from 'next/link';
 import Layout from '../components/layout/Layout';
-import { motion } from 'framer-motion';
+// import { motion } from 'framer-motion';
 import { 
   Users, MessageSquare, Smile, ArrowRight, 
   Star, Sparkles, Heart, Clock, CheckCircle2
@@ -13,6 +13,11 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 
+import { auth, db } from '../lib/firebase';
+import { signInUser, signUpUser, signOutUser, updateUserProfile } from '../lib/api';
+// OR use the apiClient approach:
+import apiClient from '../lib/api';
+
 export default function HomePage() {
   const [mounted, setMounted] = useState(false);
 
@@ -20,25 +25,9 @@ export default function HomePage() {
     setMounted(true);
   }, []);
 
-  // Animation variants
-  const fadeInUp = {
-    hidden: { opacity: 0, y: 20 },
-    visible: { 
-      opacity: 1, 
-      y: 0,
-      transition: { duration: 0.5 }
-    }
-  };
-
-  const staggerContainer = {
-    hidden: { opacity: 0 },
-    visible: {
-      opacity: 1,
-      transition: {
-        staggerChildren: 0.2
-      }
-    }
-  };
+  // Animation variants (unused now)
+  // const fadeInUp = { ... };
+  // const staggerContainer = { ... };
 
   const testimonials = [
     {
@@ -112,11 +101,8 @@ export default function HomePage() {
           <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[800px] h-[800px] rounded-full bg-gradient-to-br from-pink-600/20 to-purple-600/20 blur-3xl pointer-events-none"></div>
           
           <div className="container mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
-            <motion.div 
+            <div 
               className="flex flex-col items-center text-center max-w-3xl mx-auto"
-              initial="hidden"
-              animate="visible"
-              variants={fadeInUp}
             >
               <Badge className="mb-6 bg-pink-500 hover:bg-pink-600 text-white px-4 py-1.5 rounded-full">
                 <Sparkles className="h-3.5 w-3.5 mr-2" /> New Feature: Mood Tracking
@@ -127,11 +113,8 @@ export default function HomePage() {
               <p className="text-xl md:text-2xl text-gray-300 mb-10 max-w-2xl font-light">
                 Skip the roommate horror stories. Our advanced personality matching system finds you compatible roommates based on lifestyle, habits, and preferences.
               </p>
-              <motion.div 
+              <div 
                 className="flex flex-col sm:flex-row gap-4"
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.3 }}
               >
                 <Button asChild size="lg" className="bg-gradient-to-r from-pink-500 to-purple-600 hover:from-pink-600 hover:to-purple-700 text-white border-0 shadow-lg shadow-pink-900/30 rounded-full">
                   <Link href="/auth/signup" className="flex items-center px-8 py-6 text-lg">
@@ -143,29 +126,23 @@ export default function HomePage() {
                     Learn More
                   </Link>
                 </Button>
-              </motion.div>
-            </motion.div>
+              </div>
+            </div>
 
             {/* Floating badges */}
             <div className="absolute top-20 left-20 hidden lg:block">
-              <motion.div 
+              <div 
                 className="bg-black/40 backdrop-blur-md px-4 py-2 rounded-full border border-pink-500/30 text-white text-sm flex items-center"
-                initial={{ opacity: 0, x: -20 }}
-                animate={{ opacity: 1, x: 0 }}
-                transition={{ delay: 0.5 }}
               >
                 <CheckCircle2 className="h-4 w-4 text-pink-500 mr-2" /> 93% Match Rate
-              </motion.div>
+              </div>
             </div>
             <div className="absolute top-40 right-20 hidden lg:block">
-              <motion.div 
+              <div 
                 className="bg-black/40 backdrop-blur-md px-4 py-2 rounded-full border border-purple-500/30 text-white text-sm flex items-center"
-                initial={{ opacity: 0, x: 20 }}
-                animate={{ opacity: 1, x: 0 }}
-                transition={{ delay: 0.7 }}
               >
                 <Heart className="h-4 w-4 text-purple-500 mr-2" /> 10,000+ Happy Roommates
-              </motion.div>
+              </div>
             </div>
           </div>
         </section>
@@ -173,28 +150,20 @@ export default function HomePage() {
         {/* Features Grid */}
         <section className="relative py-20">
           <div className="container mx-auto px-4 sm:px-6 lg:px-8">
-            <motion.div 
+            <div 
               className="text-center mb-16"
-              variants={fadeInUp}
-              initial="hidden"
-              whileInView="visible"
-              viewport={{ once: true }}
             >
               <h2 className="text-3xl md:text-5xl font-bold text-white mb-4 font-outfit">How RoomieMatch Works</h2>
               <p className="text-xl text-gray-300 max-w-2xl mx-auto font-light">
                 Our scientifically-backed approach to roommate matching ensures greater compatibility and happier living situations.
               </p>
-            </motion.div>
+            </div>
 
-            <motion.div 
+            <div 
               className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6"
-              variants={staggerContainer}
-              initial="hidden"
-              whileInView="visible"
-              viewport={{ once: true }}
             >
               {features.map((feature, index) => (
-                <motion.div key={index} variants={fadeInUp}>
+                <div key={index}>
                   <div className="bg-gradient-to-br from-black to-gray-900 p-1 rounded-3xl h-full">
                     <div className="bg-black rounded-3xl p-6 h-full border border-gray-800 hover:border-pink-500/30 transition-all duration-300 flex flex-col">
                       <div className="bg-gradient-to-br from-pink-500 to-purple-600 p-3 rounded-2xl h-12 w-12 flex items-center justify-center mb-5">
@@ -204,39 +173,31 @@ export default function HomePage() {
                       <p className="text-gray-400 flex-grow">{feature.description}</p>
                     </div>
                   </div>
-                </motion.div>
+                </div>
               ))}
-            </motion.div>
+            </div>
           </div>
         </section>
 
         {/* Process Steps */}
         <section className="relative py-20">
           <div className="container mx-auto px-4 sm:px-6 lg:px-8">
-            <motion.div 
+            <div 
               className="text-center mb-16"
-              variants={fadeInUp}
-              initial="hidden"
-              whileInView="visible"
-              viewport={{ once: true }}
             >
               <h2 className="text-3xl md:text-5xl font-bold text-white mb-4 font-outfit">Simple 3-Step Process</h2>
               <p className="text-xl text-gray-300 max-w-2xl mx-auto font-light">
                 Finding your perfect roommate has never been easier
               </p>
-            </motion.div>
+            </div>
 
-            <motion.div 
+            <div 
               className="grid grid-cols-1 md:grid-cols-3 gap-6 relative"
-              variants={staggerContainer}
-              initial="hidden"
-              whileInView="visible"
-              viewport={{ once: true }}
             >
               {/* Connection lines between steps (desktop only) */}
               <div className="absolute top-1/2 left-0 right-0 h-0.5 bg-gradient-to-r from-pink-500 to-purple-600 hidden md:block"></div>
               
-              <motion.div variants={fadeInUp}>
+              <div>
                 <div className="relative flex flex-col items-center text-center p-8 z-10">
                   <div className="bg-gradient-to-br from-pink-500 to-purple-600 rounded-full h-16 w-16 flex items-center justify-center text-2xl font-bold mb-6 relative">
                     <div className="absolute inset-0 rounded-full bg-gradient-to-br from-pink-500 to-purple-600 animate-pulse opacity-50 blur-md"></div>
@@ -247,9 +208,9 @@ export default function HomePage() {
                     Complete our personality quiz to help us understand your living preferences, habits, and personality traits.
                   </p>
                 </div>
-              </motion.div>
+              </div>
 
-              <motion.div variants={fadeInUp}>
+              <div>
                 <div className="relative flex flex-col items-center text-center p-8 z-10">
                   <div className="bg-gradient-to-br from-pink-500 to-purple-600 rounded-full h-16 w-16 flex items-center justify-center text-2xl font-bold mb-6 relative">
                     <div className="absolute inset-0 rounded-full bg-gradient-to-br from-pink-500 to-purple-600 animate-pulse opacity-50 blur-md"></div>
@@ -260,9 +221,9 @@ export default function HomePage() {
                     Review your personalized matches ranked by compatibility scores and detailed personality insights.
                   </p>
                 </div>
-              </motion.div>
+              </div>
 
-              <motion.div variants={fadeInUp}>
+              <div>
                 <div className="relative flex flex-col items-center text-center p-8 z-10">
                   <div className="bg-gradient-to-br from-pink-500 to-purple-600 rounded-full h-16 w-16 flex items-center justify-center text-2xl font-bold mb-6 relative">
                     <div className="absolute inset-0 rounded-full bg-gradient-to-br from-pink-500 to-purple-600 animate-pulse opacity-50 blur-md"></div>
@@ -273,36 +234,28 @@ export default function HomePage() {
                     Message potential roommates through our platform and schedule meetings when you're ready.
                   </p>
                 </div>
-              </motion.div>
-            </motion.div>
+              </div>
+            </div>
           </div>
         </section>
 
         {/* Testimonials */}
         <section className="relative py-20">
           <div className="container mx-auto px-4 sm:px-6 lg:px-8">
-            <motion.div 
+            <div 
               className="text-center mb-16"
-              variants={fadeInUp}
-              initial="hidden"
-              whileInView="visible"
-              viewport={{ once: true }}
             >
               <h2 className="text-3xl md:text-5xl font-bold text-white mb-4 font-outfit">Happy Roommates</h2>
               <p className="text-xl text-gray-300 max-w-2xl mx-auto font-light">
                 Join thousands who've found their perfect living match
               </p>
-            </motion.div>
+            </div>
 
-            <motion.div 
+            <div 
               className="grid grid-cols-1 md:grid-cols-3 gap-8"
-              variants={staggerContainer}
-              initial="hidden"
-              whileInView="visible"
-              viewport={{ once: true }}
             >
               {testimonials.map((testimonial, index) => (
-                <motion.div key={index} variants={fadeInUp}>
+                <div key={index}>
                   <div className="group">
                     <div className="bg-gradient-to-br from-pink-500 to-purple-600 p-0.5 rounded-3xl">
                       <Card className="border-0 bg-black rounded-3xl overflow-hidden h-full">
@@ -334,9 +287,9 @@ export default function HomePage() {
                       </Card>
                     </div>
                   </div>
-                </motion.div>
+                </div>
               ))}
-            </motion.div>
+            </div>
           </div>
         </section>
 
@@ -345,12 +298,8 @@ export default function HomePage() {
           <div className="absolute inset-0 bg-gradient-to-t from-pink-600/20 via-purple-600/10 to-transparent pointer-events-none"></div>
           
           <div className="container mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
-            <motion.div 
+            <div 
               className="max-w-4xl mx-auto bg-gradient-to-br from-black to-gray-900 p-0.5 rounded-3xl overflow-hidden"
-              variants={fadeInUp}
-              initial="hidden"
-              whileInView="visible"
-              viewport={{ once: true }}
             >
               <div className="bg-black/70 backdrop-filter backdrop-blur-lg rounded-3xl p-12 border border-gray-800 relative overflow-hidden">
                 <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-pink-500 to-purple-600"></div>
@@ -369,7 +318,7 @@ export default function HomePage() {
                   </Button>
                 </div>
               </div>
-            </motion.div>
+            </div>
           </div>
         </section>
       </div>

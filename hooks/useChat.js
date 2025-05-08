@@ -1,114 +1,136 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect } from 'react';
+import { useAuth } from './useAuth';
+import { 
+  db, 
+  createChat, 
+  sendMessage, 
+  getChatMessages, 
+  getUserChats 
+} from '../lib/firebase';
 import { 
   collection, 
-  addDoc, 
+  onSnapshot, 
   query, 
-  where, 
   orderBy, 
-  onSnapshot,
-  serverTimestamp,
-  doc,
-  getDoc
+  doc 
 } from 'firebase/firestore';
-import { db } from '../lib/firebase';
-import { useAuth } from './useAuth';
 
-export function useChat(chatId) {
-  const { user, userData } = useAuth();
+export const useChat = (chatId = null) => {
+  const { currentUser } = useAuth();
   const [messages, setMessages] = useState([]);
+  const [chats, setChats] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const [chatInfo, setChatInfo] = useState(null);
-  const [otherUser, setOtherUser] = useState(null);
-  
-  const messagesListener = useRef(null);
 
-  // Load chat information and messages
+  // Get all chats for current user
   useEffect(() => {
-    if (!chatId || !user) return;
+    if (!currentUser) {
+      setChats([]);
+      setLoading(false);
+      return;
+    }
 
-    const loadChatInfo = async () => {
+    const fetchChats = async () => {
       try {
-        const chatRef = doc(db, 'chats', chatId);
-        const chatSnap = await getDoc(chatRef);
-        
-        if (!chatSnap.exists()) {
-          setError("Chat not found");
-          setLoading(false);
-          return;
-        }
-        
-        const chatData = chatSnap.data();
-        setChatInfo(chatData);
-        
-        // Find the other user in the chat
-        const otherUserId = chatData.participants.find(id => id !== user.uid);
-        if (otherUserId) {
-          const otherUserRef = doc(db, 'users', otherUserId);
-          const otherUserSnap = await getDoc(otherUserRef);
-          if (otherUserSnap.exists()) {
-            setOtherUser(otherUserSnap.data());
-          }
-        }
-
-        // Set up messages listener
-        const q = query(
-          collection(db, 'messages'),
-          where('chatId', '==', chatId),
-          orderBy('timestamp', 'asc')
-        );
-
-        messagesListener.current = onSnapshot(q, (querySnapshot) => {
-          const messageList = querySnapshot.docs.map(doc => ({
-            id: doc.id,
-            ...doc.data(),
-            timestamp: doc.data().timestamp?.toDate()
-          }));
-          
-          setMessages(messageList);
-          setLoading(false);
-        }, (err) => {
-          setError(err.message);
-          setLoading(false);
-        });
+        setLoading(true);
+        const userChats = await getUserChats(currentUser.uid);
+        setChats(userChats);
       } catch (err) {
+        console.error('Error fetching chats:', err);
         setError(err.message);
+      } finally {
         setLoading(false);
       }
     };
 
-    loadChatInfo();
+    fetchChats();
+  }, [currentUser]);
 
-    return () => {
-      if (messagesListener.current) {
-        messagesListener.current();
+  // Listen for messages in current chat
+  useEffect(() => {
+    if (!chatId || !currentUser) {
+      setMessages([]);
+      return;
+    }
+
+    setLoading(true);
+
+    // Create query for messages in this chat
+    const messagesRef = collection(db, 'chats', chatId, 'messages');
+    const messagesQuery = query(messagesRef, orderBy('createdAt', 'asc'));
+
+    // Set up real-time listener
+    const unsubscribe = onSnapshot(
+      messagesQuery,
+      (snapshot) => {
+        const newMessages = [];
+        snapshot.forEach((doc) => {
+          newMessages.push({
+            id: doc.id,
+            ...doc.data(),
+            createdAt: doc.data().createdAt?.toDate() || new Date()
+          });
+        });
+        setMessages(newMessages);
+        setLoading(false);
+      },
+      (err) => {
+        console.error('Error listening to messages:', err);
+        setError(err.message);
+        setLoading(false);
       }
-    };
-  }, [chatId, user]);
+    );
 
-  // Send message function
-  const sendMessage = async (text) => {
-    if (!chatId || !user || !text.trim()) return;
+    // Clean up listener
+    return () => unsubscribe();
+  }, [chatId, currentUser]);
+
+  // Start a new chat with another user
+  const startChat = async (otherUserId) => {
+    if (!currentUser) {
+      throw new Error('You must be logged in to start a chat');
+    }
 
     try {
-      await addDoc(collection(db, 'messages'), {
-        chatId,
-        senderId: user.uid,
-        senderName: userData?.name || user.email,
-        text,
-        timestamp: serverTimestamp()
-      });
+      const result = await createChat(currentUser.uid, otherUserId);
+      return result.chatId;
     } catch (err) {
+      console.error('Error starting chat:', err);
       setError(err.message);
+      throw err;
+    }
+  };
+
+  // Send a message in the current chat
+  const sendNewMessage = async (text, receiverId) => {
+    if (!currentUser || !chatId) {
+      throw new Error('Missing current user or chat ID');
+    }
+
+    try {
+      const messageData = {
+        text,
+        senderId: currentUser.uid,
+        receiverId,
+        senderName: currentUser.displayName || 'User',
+        createdAt: new Date()
+      };
+
+      await sendMessage(chatId, messageData);
+      return true;
+    } catch (err) {
+      console.error('Error sending message:', err);
+      setError(err.message);
+      throw err;
     }
   };
 
   return {
     messages,
+    chats,
     loading,
     error,
-    sendMessage,
-    chatInfo,
-    otherUser
+    startChat,
+    sendNewMessage
   };
-}
+};

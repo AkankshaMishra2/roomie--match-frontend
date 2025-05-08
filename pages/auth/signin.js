@@ -1,10 +1,9 @@
 // pages/auth/signin.js
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/router';
 import Head from 'next/head';
 import Link from 'next/link';
 import { motion } from 'framer-motion';
-import { signInUser } from '../../lib/api';
 import { useAuth } from '../../hooks/useAuth';
 
 export default function SignIn() {
@@ -15,12 +14,14 @@ export default function SignIn() {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const router = useRouter();
-  const { user } = useAuth();
+  const { user, signin } = useAuth();
 
   // Redirect if already logged in
-  if (user) {
-    router.push('/dashboard');
-  }
+  useEffect(() => {
+    if (user) {
+      router.push('/dashboard');
+    }
+  }, [user, router]);
 
   const handleChange = (e) => {
     setFormData({
@@ -35,8 +36,7 @@ export default function SignIn() {
     setLoading(true);
 
     try {
-      // Use our enhanced sign-in function that handles both Firebase and backend auth
-      await signInUser(formData.email, formData.password);
+      await signin(formData.email, formData.password);
       router.push('/dashboard');
     } catch (err) {
       console.error('Error signing in:', err);

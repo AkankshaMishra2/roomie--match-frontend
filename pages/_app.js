@@ -1,6 +1,7 @@
 import { useEffect } from 'react';
 import { AuthProvider } from '../hooks/useAuth';
-import '@/styles/globals.css';
+import { ChatProvider } from '../contexts/ChatContext';
+import '../styles/globals.css';
 
 function MyApp({ Component, pageProps }) {
   // Remove the server-side injected CSS when running in browser
@@ -13,7 +14,9 @@ function MyApp({ Component, pageProps }) {
 
   return (
     <AuthProvider>
-      <Component {...pageProps} />
+      <ChatProvider>
+        <Component {...pageProps} />
+      </ChatProvider>
     </AuthProvider>
   );
 }

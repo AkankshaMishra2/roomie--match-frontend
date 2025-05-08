@@ -1,72 +1,89 @@
 import { useState, useEffect } from 'react';
-import { motion } from 'framer-motion';
+import { useAuth } from '../../hooks/useAuth';
+import { subscribeToMood, updateUserMood } from '../../lib/firestore';
+import { collection, query, where, orderBy, limit, getDocs } from 'firebase/firestore';
+import { db } from '../../lib/firebase';
 
 const moods = [
-  { emoji: "😊", name: "Happy", color: "from-yellow-500/30 to-yellow-600/20", hoverColor: "from-yellow-500/40 to-yellow-600/30", textColor: "text-yellow-300" },
-  { emoji: "😴", name: "Tired", color: "from-blue-500/30 to-blue-600/20", hoverColor: "from-blue-500/40 to-blue-600/30", textColor: "text-blue-300" },
-  { emoji: "😎", name: "Chill", color: "from-green-500/30 to-green-600/20", hoverColor: "from-green-500/40 to-green-600/30", textColor: "text-green-300" },
-  { emoji: "🤔", name: "Curious", color: "from-purple-500/30 to-purple-600/20", hoverColor: "from-purple-500/40 to-purple-600/30", textColor: "text-purple-300" },
-  { emoji: "🎉", name: "Excited", color: "from-pink-500/30 to-pink-600/20", hoverColor: "from-pink-500/40 to-pink-600/30", textColor: "text-pink-300" },
-  { emoji: "📚", name: "Focused", color: "from-indigo-500/30 to-indigo-600/20", hoverColor: "from-indigo-500/40 to-indigo-600/30", textColor: "text-indigo-300" }
+  { emoji: '😄', name: 'Great', color: 'bg-green-500', hoverColor: 'hover:bg-green-600', textColor: 'text-green-500' },
+  { emoji: '🙂', name: 'Good', color: 'bg-blue-500', hoverColor: 'hover:bg-blue-600', textColor: 'text-blue-500' },
+  { emoji: '😐', name: 'Okay', color: 'bg-yellow-500', hoverColor: 'hover:bg-yellow-600', textColor: 'text-yellow-500' },
+  { emoji: '😴', name: 'Tired', color: 'bg-purple-500', hoverColor: 'hover:bg-purple-600', textColor: 'text-purple-500' },
+  { emoji: '😰', name: 'Stressed', color: 'bg-red-500', hoverColor: 'hover:bg-red-600', textColor: 'text-red-500' },
+  { emoji: '😢', name: 'Sad', color: 'bg-gray-500', hoverColor: 'hover:bg-gray-600', textColor: 'text-gray-500' }
 ];
 
-// Background particle component
-const FloatingParticle = ({ index }) => {
-  const size = Math.floor(Math.random() * 4) + 2;
-  const duration = Math.floor(Math.random() * 20) + 10;
-  const delay = Math.random() * 5;
-  
-  return (
-    <motion.div
-      className="absolute rounded-full bg-gradient-to-br from-pink-500/10 to-purple-500/10"
-      style={{ 
-        width: `${size}px`, 
-        height: `${size}px`,
-        left: `${Math.random() * 100}%`,
-        bottom: `-${size}px`
-      }}
-      initial={{ y: 0, opacity: 0 }}
-      animate={{ 
-        y: -200 - Math.random() * 100, 
-        opacity: [0, 0.4, 0],
-        x: Math.random() * 40 - 20
-      }}
-      transition={{ 
-        repeat: Infinity, 
-        duration,
-        delay,
-        ease: "linear"
-      }}
-    />
+// Background particle component (no animation)
+const FloatingParticle = ({ delay, duration, x, y }) => (
+  <div
+    className="absolute w-2 h-2 bg-white/20 rounded-full"
+    style={{ left: x, top: y, opacity: 0.5 }}
+  />
+);
+
+const getLatestMood = async (userId) => {
+  const moodQuery = query(
+    collection(db, 'moods'),
+    where('userId', '==', userId),
+    orderBy('timestamp', 'desc'),
+    limit(1)
   );
+  const snapshot = await getDocs(moodQuery);
+  if (!snapshot.empty) {
+    return snapshot.docs[0].data();
+  }
+  return null;
 };
 
-export default function MoodWidget({ currentMood, onMoodUpdate }) {
+export default function MoodWidget() {
+  const { user } = useAuth();
   const [isExpanded, setIsExpanded] = useState(false);
-  const [selectedMood, setSelectedMood] = useState(currentMood || moods[0]);
-  const [lastUpdated, setLastUpdated] = useState(currentMood ? new Date().toLocaleString() : "Never");
+  const [selectedMood, setSelectedMood] = useState(null);
+  const [lastUpdated, setLastUpdated] = useState(null);
+  const [isUpdating, setIsUpdating] = useState(false);
   
-  // Background particles array
-  const particles = Array.from({ length: 15 }, (_, i) => i);
+  // Fallback mood for initial render
+  const fallbackMood = moods[0];
+  const moodToShow = selectedMood || fallbackMood;
 
-  const handleMoodSelect = (mood) => {
-    setSelectedMood(mood);
-    setLastUpdated(new Date().toLocaleString());
-    if (onMoodUpdate) onMoodUpdate(mood);
-    setIsExpanded(false);
+  // Subscribe to mood updates
+  useEffect(() => {
+    if (!user) return;
+
+    const unsubscribe = subscribeToMood(user.uid, (moodData) => {
+      if (moodData) {
+        setSelectedMood(moodData.mood);
+        setLastUpdated(moodData.timestamp?.toDate());
+      }
+    });
+
+    return () => unsubscribe();
+  }, [user]);
+
+  const handleMoodSelect = async (mood) => {
+    if (!user || isUpdating) return;
+
+    try {
+      setIsUpdating(true);
+      await updateUserMood(user.uid, mood);
+      setSelectedMood(mood);
+      setLastUpdated(new Date());
+      setIsExpanded(false);
+    } catch (error) {
+      console.error('Error updating mood:', error);
+    } finally {
+      setIsUpdating(false);
+    }
   };
 
   return (
-    <motion.div 
-      initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
+    <div 
       className="relative bg-black rounded-xl border border-gray-800 shadow-lg overflow-hidden"
     >
       {/* Background particles */}
       <div className="absolute inset-0 overflow-hidden">
-        {particles.map((i) => (
-          <FloatingParticle key={i} index={i} />
-        ))}
+        {/* Floating particles */}
+        {/* Floating particles are now handled by the subscribeToMood function */}
       </div>
       
       {/* Gradient background effect */}
@@ -81,76 +98,71 @@ export default function MoodWidget({ currentMood, onMoodUpdate }) {
         </div>
         
         {/* Current mood selector */}
-        <motion.div
-          onClick={() => setIsExpanded(!isExpanded)}
+        <div
+          onClick={() => !isUpdating && setIsExpanded(!isExpanded)}
           className={`cursor-pointer rounded-lg flex items-center justify-between mb-4 
                     border border-gray-700/50 transition-all duration-300 backdrop-blur-sm
-                    bg-gradient-to-r ${selectedMood.color} hover:shadow-glow-sm`}
-          whileHover={{ scale: 1.02 }}
-          whileTap={{ scale: 0.98 }}
+                    bg-gradient-to-r ${moodToShow.color} hover:shadow-glow-sm
+                    ${isUpdating ? 'opacity-50 cursor-not-allowed' : ''}`}
         >
           <div className="flex items-center p-4 gap-3">
-            <span className="text-2xl">{selectedMood.emoji}</span>
-            <span className={`font-medium ${selectedMood.textColor}`}>{selectedMood.name}</span>
+            <span className="text-2xl">{moodToShow.emoji}</span>
+            <span className={`font-medium ${moodToShow.textColor}`}>{moodToShow.name}</span>
           </div>
           
           <div className="pr-4">
-            <motion.span 
-              className="flex items-center justify-center w-8 h-8 rounded-full bg-gray-800/50 text-gray-300 text-sm"
-              whileHover={{ backgroundColor: "rgba(255,255,255,0.1)" }}
-            >
-              {isExpanded ? "×" : "↓"}
-            </motion.span>
+            {isUpdating ? (
+              <div className="w-8 h-8 flex items-center justify-center">
+                <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-pink-500"></div>
+              </div>
+            ) : (
+              <span 
+                className="flex items-center justify-center w-8 h-8 rounded-full bg-gray-800/50 text-gray-300 text-sm"
+              >
+                {isExpanded ? "×" : "↓"}
+              </span>
+            )}
           </div>
-        </motion.div>
+        </div>
         
         {/* Expanded mood options */}
-        {isExpanded && (
-          <motion.div 
-            initial={{ opacity: 0, height: 0 }}
-            animate={{ opacity: 1, height: "auto" }}
+        {isExpanded && !isUpdating && (
+          <div 
             className="grid grid-cols-3 gap-2 mb-4"
           >
             {moods.map((mood, index) => (
-              <motion.div
+              <div
                 key={index}
                 onClick={() => handleMoodSelect(mood)}
-                className={`bg-gradient-to-br ${mood.color} hover:${mood.hoverColor} 
+                className={`bg-gradient-to-br ${mood.color} ${mood.hoverColor} 
                           transition-all duration-200 p-3 rounded-lg flex flex-col items-center 
                           justify-center backdrop-blur-sm border border-gray-700/50
-                          ${selectedMood.name === mood.name ? 'ring-2 ring-pink-500 ring-offset-1 ring-offset-black' : ''}`}
-                whileHover={{ 
-                  scale: 1.05,
-                  boxShadow: '0 0 15px rgba(236, 72, 153, 0.2)'
-                }}
-                whileTap={{ scale: 0.95 }}
+                          ${selectedMood?.name === mood.name ? 'ring-2 ring-pink-500 ring-offset-1 ring-offset-black' : ''}`}
               >
                 <span className="text-2xl mb-1">{mood.emoji}</span>
                 <span className={`text-sm font-medium ${mood.textColor}`}>{mood.name}</span>
-              </motion.div>
+              </div>
             ))}
-          </motion.div>
+          </div>
         )}
         
         {/* Last updated info */}
         <div className="text-xs text-gray-400 mt-2 flex justify-between items-center">
-          <span>Last updated: {lastUpdated}</span>
+          <span>Last updated: {lastUpdated ? lastUpdated.toLocaleString() : "Never"}</span>
           
-          {!isExpanded && (
-            <motion.button
+          {!isExpanded && !isUpdating && (
+            <button
               onClick={() => setIsExpanded(true)}
               className="text-xs font-medium relative group"
-              whileHover={{ scale: 1.05 }}
-              whileTap={{ scale: 0.95 }}
             >
               <span className="bg-clip-text text-transparent bg-gradient-to-r from-pink-400 to-purple-400">
                 Update Your Mood
               </span>
               <span className="absolute -bottom-1 left-0 w-0 h-0.5 bg-gradient-to-r from-pink-500 to-purple-500 group-hover:w-full transition-all duration-300"></span>
-            </motion.button>
+            </button>
           )}
         </div>
       </div>
-    </motion.div>
+    </div>
   );
 }

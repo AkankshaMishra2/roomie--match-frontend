@@ -4,7 +4,6 @@ import { useRouter } from 'next/router';
 import Head from 'next/head';
 import Link from 'next/link';
 import { motion } from 'framer-motion';
-import { signUpUser } from '../../lib/api';
 import { useAuth } from '../../hooks/useAuth';
 
 export default function SignUp() {
@@ -20,7 +19,7 @@ export default function SignUp() {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const router = useRouter();
-  const { user } = useAuth();
+  const { user, signup } = useAuth();
 
   // Redirect if already logged in
   if (user) {
@@ -56,8 +55,8 @@ export default function SignUp() {
         createdAt: new Date().toISOString()
       };
   
-      // Use our enhanced sign-up function that handles both Firebase and backend
-      await signUpUser(formData.email, formData.password, userData);
+      // Use our Firebase-only sign-up function
+      await signup(formData.email, formData.password, userData);
       
       router.push('/dashboard');
     } catch (err) {

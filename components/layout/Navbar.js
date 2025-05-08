@@ -3,7 +3,7 @@ import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/router';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Menu, X, User, Moon, Sun, Bell, MessageSquare, Search } from 'lucide-react';
+import { Menu, X, User, Moon, Sun, Bell, MessageSquare, Search, LogOut } from 'lucide-react';
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import {
@@ -15,18 +15,24 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Badge } from "@/components/ui/badge";
+import { useAuth } from '@/hooks/useAuth'; // Import AuthContext
 
 export default function Navbar() {
   const [isScrolled, setIsScrolled] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isDarkMode, setIsDarkMode] = useState(true); // Default to dark mode
   const router = useRouter();
-  const user = null; // Replace with your auth logic when ready
   
-  // Function placeholders until you connect your auth
-  const signOut = () => {
-    console.log("Sign out clicked");
-    // Add your signOut logic here
+  // Use auth context instead of a dummy user
+  const { user, signOut } = useAuth(); // Get user and signOut from auth context
+
+  const handleSignOut = async () => {
+    try {
+      await signOut();
+      router.push('/'); // Redirect to home page after sign out
+    } catch (error) {
+      console.error("Error signing out:", error);
+    }
   };
 
   const toggleDarkMode = () => {
@@ -310,11 +316,27 @@ export default function Navbar() {
                       <Link href="/chat">Messages</Link>
                     </DropdownMenuItem>
                     <DropdownMenuSeparator className={isDarkMode ? "bg-gray-800" : ""} />
-                    <DropdownMenuItem onClick={signOut} className={isDarkMode ? "hover:bg-gray-900 focus:bg-gray-900 text-pink-500" : "text-red-600"}>
+                    <DropdownMenuItem onClick={handleSignOut} className={isDarkMode ? "hover:bg-gray-900 focus:bg-gray-900 text-pink-500" : "text-red-600"}>
                       Log Out
                     </DropdownMenuItem>
                   </DropdownMenuContent>
                 </DropdownMenu>
+                
+                {/* New Sign Out Button */}
+                <motion.div whileHover="hover" whileTap="tap" variants={buttonVariants}>
+                  <Button 
+                    variant="ghost"
+                    onClick={handleSignOut}
+                    className={
+                      isDarkMode 
+                        ? 'border border-gray-800 hover:border-pink-500/30 hover:bg-gray-900 text-pink-500' 
+                        : (isScrolled ? 'border border-red-100 text-red-600 hover:bg-red-50' : 'border-white/30 text-white hover:bg-white/10')
+                    }
+                  >
+                    <LogOut size={16} className="mr-2" />
+                    Sign Out
+                  </Button>
+                </motion.div>
               </div>
             ) : (
               <>
@@ -494,12 +516,13 @@ export default function Navbar() {
                       
                       <motion.div variants={mobileMenuItemVariants} whileHover={{ x: 5 }} className="mt-3">
                         <button
-                          onClick={signOut}
-                          className={`block w-full text-left px-3 py-3 text-base font-medium rounded-md ${
+                          onClick={handleSignOut}
+                          className={`flex items-center w-full text-left px-3 py-3 text-base font-medium rounded-md ${
                             isDarkMode ? 'text-pink-500 hover:bg-gray-900/50' : 'text-red-600 hover:text-red-700 hover:bg-red-50/50'
                           } transition-all duration-200`}
                         >
-                          Log Out
+                          <LogOut size={18} className="mr-2" />
+                          Sign Out
                         </button>
                       </motion.div>
                     </>

@@ -1,152 +1,99 @@
-// components/quiz/QuizComponent.js
-import { useState, useEffect } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { useState } from 'react';
+import { useRouter } from 'next/router';
+import { useQuiz } from '../../hooks/useQuiz';
 
-const questions = [
-  {
-    id: 1,
-    question: "Do you prefer to...",
-    options: ["Wake up early", "Stay up late"],
-    images: ["☀️", "🌙"]
-  },
-  {
-    id: 2,
-    question: "Your ideal living space is...",
-    options: ["Neat and organized", "Comfortable and lived-in"],
-    images: ["🧹", "🛋️"]
-  },
-  {
-    id: 3,
-    question: "On weekends, you'd rather...",
-    options: ["Go out and socialize", "Stay in and relax"],
-    images: ["🎉", "📺"]
-  },
-  {
-    id: 4,
-    question: "When it comes to noise levels...",
-    options: ["I prefer quiet", "I don't mind some noise"],
-    images: ["🤫", "🔊"]
-  },
-  {
-    id: 5,
-    question: "With shared spaces, you're...",
-    options: ["Very respectful of boundaries", "Happy to share everything"],
-    images: ["🚪", "🤝"]
-  }
-];
-
-export default function QuizComponent({ onComplete }) {
-  const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
+const QuizComponent = () => {
+  const { quizQuestions, submitQuiz, loading, error } = useQuiz();
+  const [current, setCurrent] = useState(0);
   const [answers, setAnswers] = useState({});
-  const [direction, setDirection] = useState(1); // 1 for forward, -1 for backward
-  const [progress, setProgress] = useState(0);
-  
-  useEffect(() => {
-    setProgress((currentQuestionIndex / questions.length) * 100);
-  }, [currentQuestionIndex]);
+  const [submitted, setSubmitted] = useState(false);
+  const router = useRouter();
 
-  const handleAnswer = (optionIndex) => {
-    const newAnswers = { ...answers, [currentQuestionIndex]: optionIndex };
-    setAnswers(newAnswers);
-    
-    if (currentQuestionIndex < questions.length - 1) {
-      setDirection(1);
-      setCurrentQuestionIndex(currentQuestionIndex + 1);
-    } else {
-      if (onComplete) onComplete(newAnswers);
+  const handleSelect = (qid, value) => {
+    setAnswers({ ...answers, [qid]: value });
+  };
+
+  const handleNext = () => {
+    if (!answers[quizQuestions[current].id]) return;
+    setCurrent(current + 1);
+  };
+
+  const handleSubmit = async () => {
+    if (!answers[quizQuestions[current].id]) return;
+    try {
+      await submitQuiz(answers);
+      setSubmitted(true);
+      setTimeout(() => router.push('/roommates'), 2000);
+    } catch (e) {
+      // error handled in hook
     }
   };
 
-  const goToPrevious = () => {
-    if (currentQuestionIndex > 0) {
-      setDirection(-1);
-      setCurrentQuestionIndex(currentQuestionIndex - 1);
-    }
-  };
+  if (submitted) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-[300px] bg-gray-900 text-white rounded-lg shadow-lg p-8">
+        <h2 className="text-2xl font-bold mb-4">Thank you for completing the quiz!</h2>
+        <p>Redirecting to find roommates...</p>
+      </div>
+    );
+  }
 
-  const currentQuestion = questions[currentQuestionIndex];
-  
+  const q = quizQuestions[current];
+  const isLast = current === quizQuestions.length - 1;
+
   return (
-    <motion.div 
-      initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
-      className="max-w-md mx-auto bg-white rounded-xl shadow-md overflow-hidden"
-    >
-      {/* Progress bar */}
-      <div className="w-full h-2 bg-gray-200">
-        <motion.div 
-          className="h-full bg-purple-600" 
-          initial={{ width: `${(currentQuestionIndex / questions.length) * 100}%` }}
-          animate={{ width: `${progress}%` }}
-          transition={{ duration: 0.5 }}
-        />
-      </div>
-      
-      <div className="p-6">
-        <div className="flex justify-between items-center mb-6">
-          <h3 className="text-lg font-medium text-gray-900">Roommate Quiz</h3>
-          <span className="text-sm text-gray-500">Question {currentQuestionIndex + 1} of {questions.length}</span>
+    <div className="flex flex-col items-center justify-center min-h-[400px] bg-gray-900 text-white rounded-lg shadow-lg p-8 w-full max-w-lg mx-auto">
+      <div className="w-full mb-6">
+        <div className="text-sm text-purple-400 mb-2">
+          Question {current + 1} of {quizQuestions.length}
         </div>
-        
-        <AnimatePresence mode="wait">
-          <motion.div 
-            key={currentQuestionIndex}
-            initial={{ x: direction * 50, opacity: 0 }}
-            animate={{ x: 0, opacity: 1 }}
-            exit={{ x: direction * -50, opacity: 0 }}
-            transition={{ duration: 0.3 }}
-            className="mb-8"
-          >
-            <h2 className="text-xl font-semibold text-gray-800 mb-6">{currentQuestion.question}</h2>
-            
-            <div className="grid grid-cols-2 gap-4">
-              {currentQuestion.options.map((option, index) => (
-                <motion.button
-                  key={index}
-                  whileHover={{ scale: 1.03 }}
-                  whileTap={{ scale: 0.97 }}
-                  onClick={() => handleAnswer(index)}
-                  className={`py-4 px-3 rounded-lg border-2 flex flex-col items-center justify-center transition-all duration-200
-                    ${answers[currentQuestionIndex] === index 
-                      ? 'border-purple-600 bg-purple-50 text-purple-800' 
-                      : 'border-gray-200 hover:border-purple-300 hover:bg-purple-50'}
-                  `}
-                >
-                  <span className="text-3xl mb-2">{currentQuestion.images[index]}</span>
-                  <span className="text-center">{option}</span>
-                </motion.button>
-              ))}
-            </div>
-          </motion.div>
-        </AnimatePresence>
-        
-        <div className="flex justify-between">
+        <h2 className="text-xl font-semibold mb-4">{q.question}</h2>
+        <div className="space-y-3">
+          {q.options.map(opt => (
+            <button
+              key={opt.value}
+              className={`w-full py-2 px-4 rounded-lg border transition-colors
+                ${answers[q.id] === opt.value
+                  ? 'bg-purple-600 border-purple-400 text-white'
+                  : 'bg-gray-800 border-gray-700 text-gray-200 hover:bg-purple-800'}
+              `}
+              onClick={() => handleSelect(q.id, opt.value)}
+            >
+              {opt.label}
+            </button>
+          ))}
+        </div>
+      </div>
+      <div className="flex justify-between w-full mt-6">
+        <button
+          className="px-4 py-2 rounded bg-gray-700 text-gray-300 disabled:opacity-50"
+          onClick={() => setCurrent(current - 1)}
+          disabled={current === 0}
+        >
+          Back
+        </button>
+        {isLast ? (
           <button
-            onClick={goToPrevious}
-            disabled={currentQuestionIndex === 0}
-            className={`px-4 py-2 rounded-md text-sm font-medium transition-colors
-              ${currentQuestionIndex === 0 
-                ? 'text-gray-400 cursor-not-allowed' 
-                : 'text-purple-600 hover:text-purple-800'}
-            `}
+            className="px-4 py-2 rounded bg-purple-600 text-white disabled:opacity-50"
+            onClick={handleSubmit}
+            disabled={!answers[q.id] || loading}
           >
-            Previous
+            Submit
           </button>
-          
-          <div className="flex space-x-1">
-            {questions.map((_, index) => (
-              <div 
-                key={index} 
-                className={`w-2 h-2 rounded-full ${
-                  index === currentQuestionIndex ? 'bg-purple-600' : 'bg-gray-300'
-                }`}
-              />
-            ))}
-          </div>
-          
-          <div className="w-20"></div> {/* Empty div for balanced layout */}
-        </div>
+        ) : (
+          <button
+            className="px-4 py-2 rounded bg-purple-600 text-white disabled:opacity-50"
+            onClick={handleNext}
+            disabled={!answers[q.id] || loading}
+          >
+            Next
+          </button>
+        )}
       </div>
-    </motion.div>
+      {loading && <div className="mt-4 text-purple-300">Saving your answers...</div>}
+      {error && <div className="mt-4 text-red-400">{error}</div>}
+    </div>
   );
-}
+};
+
+export default QuizComponent;
