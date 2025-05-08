@@ -32,11 +32,6 @@
       "static/chunks/main.js",
       "static/chunks/pages/messages.js"
     ],
-    "/quiz": [
-      "static/chunks/webpack.js",
-      "static/chunks/main.js",
-      "static/chunks/pages/quiz.js"
-    ],
     "/roommates": [
       "static/chunks/webpack.js",
       "static/chunks/main.js",

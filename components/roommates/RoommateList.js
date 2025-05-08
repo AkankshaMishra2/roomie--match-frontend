@@ -16,17 +16,22 @@ const RoommateList = ({ currentUser, filters }) => {
       try {
         // Build the query based on filters
         let roommatesQuery = query(
-          collection(db, 'roomie-users'),
-          where('uid', '!=', currentUser.uid),
-          limit(20)
+          collection(db, 'roomie-users')
         );
         
+        console.log('Fetching roommates for user:', currentUser.uid);
         const querySnapshot = await getDocs(roommatesQuery);
-        const roommatesList = querySnapshot.docs.map(doc => ({
-          id: doc.id,
-          ...doc.data()
-        }));
+        console.log('Total profiles found:', querySnapshot.size);
         
+        // Filter out the current user by document ID
+        const roommatesList = querySnapshot.docs
+          .filter(doc => doc.id !== currentUser.uid)
+          .map(doc => ({
+            id: doc.id,
+            ...doc.data()
+          }));
+        
+        console.log('Processed roommates list:', roommatesList);
         setRoommates(roommatesList);
       } catch (err) {
         console.error("Error fetching roommates:", err);
