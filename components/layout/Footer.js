@@ -1,6 +1,6 @@
 // components/layout/Footer.js
 import Link from 'next/link';
-import { Heart, Users, MessageSquare, Smile, Clock } from 'lucide-react';
+import { Heart, Users, MessageSquare, Smile, Clock, Phone } from 'lucide-react';
 
 export default function Footer() {
   const currentYear = new Date().getFullYear();
@@ -22,10 +22,10 @@ export default function Footer() {
           {/* Brand & Description */}
           <div className="md:col-span-2 space-y-4">
             <Link href="/" className="text-2xl font-bold text-white bg-clip-text text-transparent bg-gradient-to-r from-white via-pink-200 to-white inline-block font-outfit">
-              RoomieMatch
+              UniRooms
             </Link>
             <p className="text-gray-400 max-w-md text-lg">
-              Finding the perfect roommate shouldn't be stressful. RoomieMatch uses personality quizzes and mood matching to help you find your ideal living partner.
+              Finding the perfect roommate shouldn't be stressful. UniRooms uses personality quizzes and mood matching to help you find your ideal living partner.
             </p>
             <div className="flex items-center text-gray-400 mt-4">
               <span>Made with</span>
@@ -62,9 +62,9 @@ export default function Footer() {
             </div>
           </div>
           
-          {/* Resources */}
+          {/* About & Contact */}
           <div className="mt-8 md:mt-0">
-            <h3 className="text-sm font-semibold text-white tracking-wider uppercase mb-4 pb-2 border-b border-gray-800">Resources</h3>
+            <h3 className="text-sm font-semibold text-white tracking-wider uppercase mb-4 pb-2 border-b border-gray-800">About & Contact</h3>
             <ul className="space-y-3">
               <li>
                 <Link href="/about" className="text-gray-400 hover:text-pink-500 transition-colors flex items-center">
@@ -73,22 +73,14 @@ export default function Footer() {
                 </Link>
               </li>
               <li>
-                <Link href="/blog" className="text-gray-400 hover:text-pink-500 transition-colors flex items-center">
-                  <span className="bg-gradient-to-br from-pink-500/20 to-purple-600/20 h-1.5 w-1.5 rounded-full mr-2"></span>
-                  Blog
-                </Link>
-              </li>
-              <li>
-                <Link href="/faq" className="text-gray-400 hover:text-pink-500 transition-colors flex items-center">
-                  <span className="bg-gradient-to-br from-pink-500/20 to-purple-600/20 h-1.5 w-1.5 rounded-full mr-2"></span>
-                  FAQ
-                </Link>
-              </li>
-              <li>
                 <Link href="/contact" className="text-gray-400 hover:text-pink-500 transition-colors flex items-center">
                   <span className="bg-gradient-to-br from-pink-500/20 to-purple-600/20 h-1.5 w-1.5 rounded-full mr-2"></span>
-                  Contact
+                  Contact Us
                 </Link>
+              </li>
+              <li className="flex items-center text-gray-400">
+                <Phone className="h-4 w-4 mr-2 text-pink-500" />
+                <span>+1 (555) 123-4567</span>
               </li>
             </ul>
           </div>
@@ -121,7 +113,7 @@ export default function Footer() {
         
         {/* Bottom Section */}
         <div className="mt-12 pt-8 border-t border-gray-800 flex flex-col md:flex-row justify-between items-center">
-          <p className="text-gray-400">© {currentYear} RoomieMatch. All rights reserved.</p>
+          <p className="text-gray-400">© {currentYear} UniRooms. All rights reserved.</p>
           
           {/* Social Icons */}
           <div className="mt-6 md:mt-0 flex space-x-4">

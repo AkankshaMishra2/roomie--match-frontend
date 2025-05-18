@@ -114,7 +114,7 @@ export default function SignUp() {
   return (
     <>
       <Head>
-        <title>Sign Up - RoomieMatch</title>
+        <title>Sign Up - UniRooms</title>
       </Head>
 
       <motion.div
@@ -128,24 +128,13 @@ export default function SignUp() {
 
         <div className="max-w-md w-full space-y-8 relative z-10">
           <div className="text-center">
-            <motion.div
-              className="flex justify-center"
-              initial={{ y: -20, opacity: 0 }}
-              animate={{ y: 0, opacity: 1 }}
-              transition={{ delay: 0.1, duration: 0.5 }}
-            >
-              <h1 className="text-4xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-pink-500 to-purple-600">
-                RoomieMatch
-              </h1>
-            </motion.div>
-            
             <motion.h2 
               className="mt-6 text-3xl font-extrabold text-white"
               initial={{ y: -20, opacity: 0 }}
               animate={{ y: 0, opacity: 1 }}
               transition={{ delay: 0.2, duration: 0.5 }}
             >
-              Create your RoomieMatch account
+              Create your UniRooms account
             </motion.h2>
             <motion.p 
               className="mt-2 text-sm text-gray-300"

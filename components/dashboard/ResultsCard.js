@@ -8,7 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { MessageSquare, Star, MapPin } from 'lucide-react';
 
-export default function ResultsCard() {
+export default function ResultsCard({ hasTakenQuiz, onTakeQuiz, onRetakeQuiz, onPlayThisOrThat }) {
   const { user } = useAuth();
   const [potentialRoommates, setPotentialRoommates] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -44,11 +44,21 @@ export default function ResultsCard() {
     return (
       <div className="bg-black/40 backdrop-blur-md rounded-2xl p-6 border border-gray-800">
         <div className="text-center py-8">
-          <h3 className="text-xl font-semibold text-white mb-2">No Matches Yet</h3>
-          <p className="text-gray-400 mb-4">Complete your profile and quiz to find potential roommates!</p>
-          <Button variant="outline" className="border-pink-500/30 text-pink-500 hover:bg-pink-500/10">
-            Update Profile
-          </Button>
+          <h3 className="text-xl font-semibold text-white mb-6">No Matches Yet</h3>
+          <div className="flex flex-col gap-4 items-center justify-center">
+            <Button
+              className="bg-gradient-to-r from-pink-500 to-purple-600 text-white text-base font-semibold px-6 py-2 rounded-lg shadow-lg hover:scale-105 transition-transform"
+              onClick={onTakeQuiz}
+            >
+              Take Quiz
+            </Button>
+            <Button
+              className="bg-gradient-to-r from-purple-600 to-pink-500 text-white text-base font-semibold px-6 py-2 rounded-lg shadow-lg hover:scale-105 transition-transform"
+              onClick={onPlayThisOrThat}
+            >
+              Play This or That
+            </Button>
+          </div>
         </div>
       </div>
     );

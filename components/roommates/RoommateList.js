@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { collection, getDocs, query, where, orderBy, limit } from 'firebase/firestore';
+import { collection, getDocs, query } from 'firebase/firestore';
 import { db } from '../../lib/firebase';
 import RoommateCard from './RoommateCard';
 
@@ -12,35 +12,29 @@ const RoommateList = ({ currentUser, filters }) => {
     const fetchRoommates = async () => {
       setLoading(true);
       setError(null);
-      
       try {
+        // Fetch accepted matches
+        const matchesSnapshot = await getDocs(collection(db, 'roomie-users', currentUser.uid, 'matches'));
+        const acceptedIds = matchesSnapshot.docs.map(doc => doc.id);
         // Build the query based on filters
         let roommatesQuery = query(
           collection(db, 'roomie-users')
         );
-        
-        console.log('Fetching roommates for user:', currentUser.uid);
         const querySnapshot = await getDocs(roommatesQuery);
-        console.log('Total profiles found:', querySnapshot.size);
-        
-        // Filter out the current user by document ID
+        // Filter out the current user and accepted matches
         const roommatesList = querySnapshot.docs
-          .filter(doc => doc.id !== currentUser.uid)
+          .filter(doc => doc.id !== currentUser.uid && !acceptedIds.includes(doc.id))
           .map(doc => ({
             id: doc.id,
             ...doc.data()
           }));
-        
-        console.log('Processed roommates list:', roommatesList);
         setRoommates(roommatesList);
       } catch (err) {
-        console.error("Error fetching roommates:", err);
         setError("Failed to fetch roommates");
       } finally {
         setLoading(false);
       }
     };
-
     if (currentUser) {
       fetchRoommates();
     }

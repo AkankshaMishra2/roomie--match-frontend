@@ -6,6 +6,7 @@ import RoommateFilters from '../components/roommates/RoommateFilters';
 import ProtectedRoute from '../components/auth/ProtectedRoute';
 import { useAuth } from '../hooks/useAuth';
 import { motion, AnimatePresence } from 'framer-motion';
+import ThisOrThatQuizComponent from '../components/quiz/ThisOrThatQuizComponent';
 
 const FindRoommates = () => {
   const { user, loading } = useAuth();
@@ -13,6 +14,7 @@ const FindRoommates = () => {
   const [filters, setFilters] = useState({});
   const [showFilters, setShowFilters] = useState(false);
   const [formSubmitted, setFormSubmitted] = useState(false);
+  const [showThisOrThat, setShowThisOrThat] = useState(false);
 
   const handleFilterChange = (newFilters) => {
     setFilters(newFilters);
@@ -49,7 +51,7 @@ const FindRoommates = () => {
             {/* Action Buttons */}
             <div className="flex justify-center mb-16 space-x-6">
               <button
-                onClick={() => router.push('/quiz')}
+                onClick={() => setShowThisOrThat(true)}
                 className="flex items-center px-8 py-4 bg-transparent border-2 border-pink-500 rounded-xl text-pink-400 hover:bg-pink-900 hover:bg-opacity-30 transition-all duration-300 shadow-lg hover:shadow-pink-500/30"
               >
                 <svg 
@@ -108,6 +110,22 @@ const FindRoommates = () => {
                 </motion.div>
               )}
             </AnimatePresence>
+
+            {/* ThisOrThatQuiz Modal */}
+            {showThisOrThat && (
+              <div className="fixed inset-0 bg-black bg-opacity-80 flex items-center justify-center z-50">
+                <div className="bg-gray-900 rounded-2xl shadow-2xl p-6 w-full max-w-lg relative">
+                  <button
+                    className="absolute top-3 right-3 text-gray-400 hover:text-pink-400 text-2xl font-bold z-10"
+                    onClick={() => setShowThisOrThat(false)}
+                    aria-label="Close"
+                  >
+                    ×
+                  </button>
+                  <ThisOrThatQuizComponent onComplete={() => setShowThisOrThat(false)} />
+                </div>
+              </div>
+            )}
           </div>
         </div>
       </Layout>

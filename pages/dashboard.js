@@ -19,8 +19,10 @@ import {
   saveQuizAnswers
 } from '../lib/firestore';
 import MatchRequestsModal from '../components/matches/MatchRequestsModal';
-import { collection, query, where, onSnapshot, getDocs } from 'firebase/firestore';
+import { collection, query, where, onSnapshot, getDocs, getDoc, doc } from 'firebase/firestore';
 import { db } from '../lib/firebase';
+import { useChat } from '../contexts/ChatContext';
+import ThisOrThatQuizComponent from '../components/quiz/ThisOrThatQuizComponent';
 
 export default function Dashboard() {
   const { userData, user } = useAuth();
@@ -35,7 +37,13 @@ export default function Dashboard() {
     matchRequests: 0
   });
   const [recentActivity, setRecentActivity] = useState([]);
+  const [hasTakenQuiz, setHasTakenQuiz] = useState(false);
   const router = useRouter();
+  const { unreadCount, markAllMessagesAsRead } = useChat();
+  const [activeMatches, setActiveMatches] = useState([]);
+  const [showActiveMatchesModal, setShowActiveMatchesModal] = useState(false);
+  const [showThisOrThat, setShowThisOrThat] = useState(false);
+  const [hasPlayedThisOrThat, setHasPlayedThisOrThat] = useState(false);
 
   // Set up real-time listeners
   useEffect(() => {
@@ -109,6 +117,45 @@ export default function Dashboard() {
       setRecentActivity(activities);
     });
 
+    // Check if user has taken the quiz
+    const checkQuizStatus = async () => {
+      const quizDoc = await getDoc(doc(db, 'roomie-users', user.uid, 'quiz', 'answers'));
+      setHasTakenQuiz(quizDoc.exists());
+    };
+    
+    checkQuizStatus();
+
+    // Check if user has played ThisOrThat
+    const checkThisOrThat = async () => {
+      const userDoc = await getDoc(doc(db, 'roomie-users', user.uid));
+      setHasPlayedThisOrThat(!!userDoc.data()?.thisOrThatCompleted);
+    };
+    checkThisOrThat();
+
+    // Fetch active matches (accepted requests)
+    const matchesRef = collection(db, 'roomie-users', user.uid, 'matches');
+    const unsubscribeMatches = onSnapshot(matchesRef, async (snapshot) => {
+      const matchesData = await Promise.all(snapshot.docs.map(async docSnap => {
+        const match = docSnap.data();
+        let matchedUserName = '';
+        try {
+          const matchedUserDoc = await getDoc(doc(db, 'roomie-users', match.userId));
+          if (matchedUserDoc.exists()) {
+            matchedUserName = matchedUserDoc.data().name || match.userId;
+          } else {
+            matchedUserName = match.userId;
+          }
+        } catch {}
+        return {
+          id: docSnap.id,
+          ...match,
+          matchedUserName
+        };
+      }));
+      setActiveMatches(matchesData);
+      setDashboardStats((prev) => ({ ...prev, activeMatches: matchesData.length }));
+    });
+
     // Cleanup listeners on unmount
     return () => {
       unsubscribeRequests();
@@ -117,6 +164,7 @@ export default function Dashboard() {
       unsubscribeStats();
       unsubscribeCompatibility();
       unsubscribeActivity();
+      unsubscribeMatches();
     };
   }, [user]);
 
@@ -127,9 +175,15 @@ export default function Dashboard() {
     try {
       await saveQuizAnswers(user.uid, answers);
       setShowQuiz(false);
+      setHasTakenQuiz(true);
     } catch (error) {
       console.error('Error saving quiz answers:', error);
     }
+  };
+
+  // Handle quiz retake
+  const handleQuizRetake = () => {
+    setShowQuiz(true);
   };
 
   // Animated gradient particles background effect
@@ -199,11 +253,11 @@ export default function Dashboard() {
 
   return (
     <ProtectedRoute>
-      <div className="min-h-screen bg-black bg-gradient-to-t from-purple-900/20 to-black text-white flex flex-col relative">
+      <div className="min-h-screen bg-gradient-to-br from-black via-[#1a0826] to-black text-gray-100 flex flex-col relative overflow-x-hidden">
         <FloatingParticles />
         <Navbar />
-        <main className="flex-grow pt-16 relative z-10">
-          <div className="max-w-7xl mx-auto py-10 px-4 sm:px-6 lg:px-8">
+        <main className="flex-grow pt-20 relative z-10">
+          <div className="max-w-7xl mx-auto py-10 px-4 sm:px-8 lg:px-12">
             {/* Welcome message */}
             <motion.div
               initial={{ opacity: 0, y: -20 }}
@@ -211,10 +265,10 @@ export default function Dashboard() {
               transition={{ duration: 0.5 }}
               className="mb-12"
             >
-              <h1 className="text-4xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-pink-500 to-purple-600">
+              <h1 className="text-5xl md:text-6xl font-extrabold bg-clip-text text-transparent bg-gradient-to-r from-purple-300 via-pink-400 to-purple-700 drop-shadow-glow tracking-tight mb-2">
                 Welcome back, {userData?.name || user?.displayName || 'User'}!
               </h1>
-              <p className="mt-2 text-gray-300">
+              <p className="mt-2 text-lg md:text-2xl text-gray-400 font-light">
                 {userData?.university ? 
                   `Find compatible roommates at ${userData.university}` :
                   'Complete your profile to find your perfect roommate match!'}
@@ -222,34 +276,45 @@ export default function Dashboard() {
             </motion.div>
 
             {/* Stats Overview */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
-              <div className="rounded-2xl bg-gray-900 border-2 border-blue-600/30 shadow-lg p-6 flex flex-col items-center transition-transform hover:scale-105 hover:shadow-xl">
-                <span className="text-4xl mb-2 text-blue-400">👥</span>
-                <span className="text-3xl font-bold text-white">{dashboardStats.activeMatches}</span>
-                <span className="text-base text-white mt-1">Active Matches</span>
-              </div>
-              <div
-                onClick={() => router.push('/messages')}
-                style={{ cursor: 'pointer' }}
-                className="rounded-2xl bg-gray-900 border-2 border-green-500/30 shadow-lg p-6 flex flex-col items-center transition-transform hover:scale-105 hover:shadow-xl"
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-8 mb-12">
+              <motion.div
+                whileHover={{ scale: 1.03, boxShadow: "0 0 30px 0 #a21caf44" }}
+                className="rounded-2xl bg-black/80 backdrop-blur-lg border border-purple-900/40 shadow-xl p-8 flex flex-col items-center transition-all hover:shadow-pink-900/30 hover:border-pink-700/40 hover:scale-105"
               >
-                <span className="text-4xl mb-2 text-green-400">💬</span>
-                <span className="text-3xl font-bold text-white">{dashboardStats.messageCount}</span>
-                <span className="text-base text-white mt-1">New Messages</span>
-              </div>
-              <div
+                <span className="text-4xl mb-3 text-purple-300 drop-shadow-glow">👥</span>
+                <span className="text-3xl font-extrabold text-gray-100 mb-1">{activeMatches.length}</span>
+                <span className="text-base text-gray-300 font-medium">You have {activeMatches.length} active matches</span>
+                <button
+                  className="mt-4 px-6 py-2 bg-gradient-to-r from-purple-900 to-pink-900 text-gray-100 rounded-lg font-semibold shadow hover:from-pink-800 hover:to-purple-900 hover:shadow-pink-900/30 transition-all"
+                  onClick={() => setShowActiveMatchesModal(true)}
+                >
+                  View
+                </button>
+              </motion.div>
+              <motion.div
+                whileHover={{ scale: 1.03, boxShadow: "0 0 30px 0 #a78bfa33" }}
+                className="rounded-2xl bg-black/80 backdrop-blur-lg border border-purple-900/40 shadow-xl p-8 flex flex-col items-center transition-all hover:shadow-purple-900/30 hover:border-purple-700/40 hover:scale-105"
+                onClick={() => { markAllMessagesAsRead(); router.push('/messages'); }}
+                style={{ cursor: 'pointer' }}
+              >
+                <span className="text-4xl mb-3 text-green-300 drop-shadow-glow">💬</span>
+                <span className="text-3xl font-extrabold text-gray-100 mb-1">{unreadCount}</span>
+                <span className="text-base text-gray-300 font-medium">New Messages</span>
+              </motion.div>
+              <motion.div
+                whileHover={{ scale: 1.03, boxShadow: "0 0 30px 0 #ec489944" }}
+                className="rounded-2xl bg-black/80 backdrop-blur-lg border border-pink-900/40 shadow-xl p-8 flex flex-col items-center transition-all hover:shadow-pink-900/30 hover:border-pink-700/40 hover:scale-105"
                 onClick={() => setShowMatchRequests(true)}
                 style={{ cursor: 'pointer' }}
-                className="rounded-2xl bg-gray-900 border-2 border-pink-500/30 shadow-lg p-6 flex flex-col items-center transition-transform hover:scale-105 hover:shadow-xl"
               >
-                <span className="text-4xl mb-2 text-pink-400">🤝</span>
-                <span className="text-3xl font-bold text-white">{dashboardStats.matchRequests}</span>
-                <span className="text-base text-white mt-1">Match Requests</span>
-              </div>
+                <span className="text-4xl mb-3 text-pink-300 drop-shadow-glow">🤝</span>
+                <span className="text-3xl font-extrabold text-gray-100 mb-1">{dashboardStats.matchRequests}</span>
+                <span className="text-base text-gray-300 font-medium">Match Requests</span>
+              </motion.div>
             </div>
             
             {/* Dashboard grid - responsive layout */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-10">
               {/* Mood tracking widget */}
               <motion.div
                 initial={{ opacity: 0, y: 20 }}
@@ -258,7 +323,7 @@ export default function Dashboard() {
                 className="col-span-1"
                 whileHover={{ y: -5, transition: { duration: 0.2 } }}
               >
-                <div className="bg-gray-900/80 backdrop-blur-lg rounded-xl p-6 shadow-2xl border border-gray-800 h-full">
+                <div className="bg-black/70 backdrop-blur-lg rounded-2xl p-8 shadow-xl border border-gray-900 h-full flex flex-col items-center">
                   <MoodWidget currentMood={userData?.currentMood} onMoodUpdate={(mood) => {
                     if (userData) {
                       userData.currentMood = mood;
@@ -274,8 +339,14 @@ export default function Dashboard() {
                 className="col-span-1 lg:col-span-1 md:col-span-2 lg:col-start-auto"
                 whileHover={{ y: -5, transition: { duration: 0.2 } }}
               >
-                <div className="bg-gray-900/80 backdrop-blur-lg rounded-xl p-6 shadow-2xl border border-gray-800 h-full">
-                  <ResultsCard userId={user?.uid} />
+                <div className="bg-black/70 backdrop-blur-lg rounded-2xl p-8 shadow-xl border border-gray-900 h-full">
+                  <ResultsCard
+                    userId={user?.uid}
+                    hasTakenQuiz={hasTakenQuiz}
+                    onTakeQuiz={() => setShowQuiz(true)}
+                    onRetakeQuiz={handleQuizRetake}
+                    onPlayThisOrThat={() => setShowThisOrThat(true)}
+                  />
                 </div>
               </motion.div>
               {/* Roommate Tip of the Day */}
@@ -284,76 +355,94 @@ export default function Dashboard() {
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ duration: 0.4, delay: 0.4 }}
                 className="col-span-1 flex items-center justify-center"
+                whileHover={{ y: -5, transition: { duration: 0.2 } }}
               >
-                <div className="bg-gradient-to-br from-purple-900/80 to-pink-800/60 border border-pink-600/30 rounded-2xl shadow-xl p-8 flex flex-col items-center text-center w-full">
-                  <span className="text-4xl mb-4 text-pink-400 drop-shadow-glow">💡</span>
-                  <h3 className="text-xl font-bold mb-2 text-white">Roommate Tip</h3>
-                  <p className="text-pink-100 mb-2 italic">
+                <div className="rounded-2xl bg-black/80 backdrop-blur-lg border border-purple-900/40 shadow-xl p-8 flex flex-col items-center transition-all w-full hover:shadow-pink-900/30 hover:border-pink-700/40 hover:scale-105">
+                  <span className="text-4xl mb-3 text-pink-300 drop-shadow-glow">💡</span>
+                  <h3 className="text-xl font-bold mb-2 text-gray-100">Roommate Tip</h3>
+                  <p className="text-gray-300 mb-2 italic text-center">
                     "Communication is key! Set clear expectations with your roommate from the start."
                   </p>
                   <span className="text-xs text-pink-300">Tip of the Day</span>
                 </div>
               </motion.div>
             </div>
-
-            {/* Recent Activity Section */}
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.4, delay: 0.4 }}
-              className="mt-8"
-            >
-              <h2 className="text-xl font-semibold mb-4">Recent Activity</h2>
-              <div className="space-y-3">
-                {recentActivity.map((activity, index) => (
-                  <ActivityItem key={index} activity={activity} />
-                ))}
-              </div>
-            </motion.div>
-            
-            {/* Action buttons */}
-            <motion.div 
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.5, delay: 0.4 }}
-              className="flex flex-wrap justify-center mt-12 gap-6"
-            >
-              {/* <motion.button
-                onClick={() => router.push('/chat')}
-                className="px-6 py-3 bg-gradient-to-r from-pink-500 to-purple-600 text-white rounded-lg shadow-lg transition-all duration-300"
-                whileHover={{ 
-                  scale: 1.05, 
-                  boxShadow: "0 0 15px rgba(236, 72, 153, 0.5)" 
-                }}
-                whileTap={{ scale: 0.98 }}
-              >
-                My Chats
-              </motion.button> */}
-              
-              <motion.button
-                onClick={() => router.push('/quiz')}
-                className="px-6 py-3 bg-transparent border border-pink-500 text-pink-400 rounded-lg shadow-lg transition-all duration-300"
-                whileHover={{ 
-                  scale: 1.05, 
-                  boxShadow: "0 0 15px rgba(236, 72, 153, 0.3)",
-                  backgroundColor: "rgba(236, 72, 153, 0.1)" 
-                }}
-                whileTap={{ scale: 0.98 }}
-              >
-                Update Preferences
-              </motion.button>
-            </motion.div>
           </div>
         </main>
         <Footer />
       </div>
       {showQuiz && (
-        <QuizComponent />
+        <div className="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-50">
+          <div className="bg-gray-900 rounded-2xl shadow-2xl p-6 w-full max-w-lg relative">
+            <button
+              className="absolute top-3 right-3 text-gray-400 hover:text-pink-400 text-2xl font-bold z-10"
+              onClick={() => setShowQuiz(false)}
+              aria-label="Close"
+            >
+              ×
+            </button>
+            <QuizComponent />
+          </div>
+        </div>
       )}
       <MatchRequestsModal 
         isOpen={showMatchRequests}
         onClose={() => setShowMatchRequests(false)}
       />
+      {/* Active Matches Modal */}
+      {showActiveMatchesModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-50">
+          <div className="bg-gray-900 border border-pink-700/30 rounded-2xl shadow-2xl p-6 w-full max-w-md">
+            <div className="flex justify-between items-center mb-4">
+              <h2 className="text-xl font-bold text-pink-400">Active Matches</h2>
+              <button
+                onClick={() => setShowActiveMatchesModal(false)}
+                className="text-gray-400 hover:text-pink-400 transition-colors"
+              >
+                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+            {activeMatches.length === 0 ? (
+              <div className="text-center py-4 text-gray-400">No active matches</div>
+            ) : (
+              <div className="space-y-4">
+                {activeMatches.map(match => (
+                  <div key={match.id} className="border border-blue-700/30 rounded-xl p-4 bg-gray-800/70 flex justify-between items-center">
+                    <div>
+                      <h4 className="font-medium text-gray-200">{match.matchedUserName}</h4>
+                      <p className="text-sm text-gray-400">Matched {match.matchedAt ? new Date(match.matchedAt.seconds ? match.matchedAt.seconds * 1000 : match.matchedAt).toLocaleDateString() : ''}</p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+      {/* Block roommate matching/results if ThisOrThat not played */}
+      {!hasPlayedThisOrThat && (
+        <div className="fixed inset-0 bg-black bg-opacity-80 flex items-center justify-center z-50">
+          <div className="bg-gray-900 rounded-2xl shadow-2xl p-6 w-full max-w-lg">
+            <ThisOrThatQuizComponent onComplete={() => setHasPlayedThisOrThat(true)} />
+          </div>
+        </div>
+      )}
+      {showThisOrThat && hasPlayedThisOrThat && (
+        <div className="fixed inset-0 bg-black bg-opacity-80 flex items-center justify-center z-50">
+          <div className="bg-gray-900 rounded-2xl shadow-2xl p-6 w-full max-w-lg relative">
+            <button
+              className="absolute top-3 right-3 text-gray-400 hover:text-pink-400 text-2xl font-bold z-10"
+              onClick={() => setShowThisOrThat(false)}
+              aria-label="Close"
+            >
+              ×
+            </button>
+            <ThisOrThatQuizComponent onComplete={() => { setShowThisOrThat(false); setHasPlayedThisOrThat(true); }} />
+          </div>
+        </div>
+      )}
     </ProtectedRoute>
   );
 }

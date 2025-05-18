@@ -1,3 +1,5 @@
+//CompatibilityModal.js
+
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/router';
 import CompatibilityChart from '../dashboard/CompatibilityChart';

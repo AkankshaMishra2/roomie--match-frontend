@@ -1,6 +1,7 @@
 import { useEffect } from 'react';
 import { AuthProvider } from '../hooks/useAuth';
 import { ChatProvider } from '../contexts/ChatContext';
+import { NotificationProvider } from '../contexts/NotificationContext';
 import '../styles/globals.css';
 
 function MyApp({ Component, pageProps }) {
@@ -14,9 +15,11 @@ function MyApp({ Component, pageProps }) {
 
   return (
     <AuthProvider>
-      <ChatProvider>
-        <Component {...pageProps} />
-      </ChatProvider>
+      <NotificationProvider>
+        <ChatProvider>
+          <Component {...pageProps} />
+        </ChatProvider>
+      </NotificationProvider>
     </AuthProvider>
   );
 }

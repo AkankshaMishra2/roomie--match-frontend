@@ -3,6 +3,8 @@
   "/_error": "pages/_error.js",
   "/_document": "pages/_document.js",
   "/dashboard": "pages/dashboard.js",
-  "/roommates": "pages/roommates.js",
-  "/messages": "pages/messages.js"
+  "/": "pages/index.js",
+  "/messages": "pages/messages.js",
+  "/auth/signup": "pages/auth/signup.js",
+  "/profile": "pages/profile.js"
 }

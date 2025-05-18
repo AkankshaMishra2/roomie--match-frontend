@@ -19,51 +19,101 @@ export const useQuiz = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
 
-  // Sample quiz questions - can be moved to a separate config file
+  // Updated quiz questions
   const quizQuestions = [
     {
-      id: 'sleepSchedule',
-      question: 'What is your typical sleep schedule?',
+      id: 'department',
+      question: 'Department',
       options: [
-        { value: 'early', label: 'Early bird (sleep early, wake early)' },
-        { value: 'late', label: 'Night owl (sleep late, wake late)' },
-        { value: 'mixed', label: 'Mixed/Flexible' }
+        { value: 'ece', label: 'ECE' },
+        { value: 'coe', label: 'COE' },
+        { value: 'cse', label: 'CSE' },
+        { value: 'copc', label: 'COPC' },
+        { value: 'ee', label: 'EE' }
       ]
     },
     {
-      id: 'cleanliness',
-      question: 'How would you describe your cleanliness level?',
+      id: 'graduatingYear',
+      question: 'Graduating year',
       options: [
-        { value: 'very_clean', label: 'Very organized and clean' },
-        { value: 'moderately_clean', label: 'Moderately clean' },
-        { value: 'messy', label: 'Comfortable with some mess' }
+        { value: '2024', label: '2024' },
+        { value: '2025', label: '2025' },
+        { value: '2026', label: '2026' },
+        { value: '2027', label: '2027' },
+        { value: '2028', label: '2028' }
       ]
     },
     {
-      id: 'noise',
-      question: 'What is your noise preference?',
+      id: 'city',
+      question: 'City',
       options: [
-        { value: 'quiet', label: 'I prefer quiet environments' },
-        { value: 'moderate', label: 'Some background noise is fine' },
-        { value: 'lively', label: 'I enjoy music and lively environments' }
+        { value: 'delhi', label: 'Delhi' },
+        { value: 'mumbai', label: 'Mumbai' },
+        { value: 'bangalore', label: 'Bangalore' },
+        { value: 'other', label: 'Other' }
       ]
     },
     {
-      id: 'guests',
-      question: 'How often do you plan to have guests over?',
+      id: 'dietaryRestrictions',
+      question: 'Do you have any religious or cultural dietary restrictions?',
       options: [
-        { value: 'rarely', label: 'Rarely or never' },
-        { value: 'occasionally', label: 'Occasionally' },
-        { value: 'frequently', label: 'Frequently' }
+        { value: 'yes', label: 'Yes (e.g., vegetarian only, halal, etc.)' },
+        { value: 'no', label: 'No' },
+        { value: 'prefer_not_to_say', label: 'Prefer not to say' }
       ]
     },
     {
-      id: 'sharing',
-      question: 'How do you feel about sharing items (food, appliances, etc.)?',
+      id: 'comfortableWithDifferentBelief',
+      question: 'Are you comfortable with a roommate who follows a different religion or belief system?',
       options: [
-        { value: 'separate', label: 'I prefer keeping things separate' },
-        { value: 'some_sharing', label: 'Some sharing is fine' },
-        { value: 'communal', label: 'I prefer a communal approach' }
+        { value: 'yes', label: 'Yes' },
+        { value: 'no', label: 'No' },
+        { value: 'prefer_not_to_say', label: 'Prefer not to say' }
+      ]
+    },
+    {
+      id: 'comfortableWithGuests',
+      question: 'Are you comfortable with guests or friends visiting often?',
+      options: [
+        { value: 'yes', label: 'Yes' },
+        { value: 'no', label: 'No' },
+        { value: 'sometimes', label: 'Sometimes' }
+      ]
+    },
+    {
+      id: 'socializeFrequency',
+      question: 'How often do you like to socialize?',
+      options: [
+        { value: 'very_often', label: 'Very often' },
+        { value: 'sometimes', label: 'Sometimes' },
+        { value: 'rarely', label: 'Rarely' }
+      ]
+    },
+    {
+      id: 'vegOrNonveg',
+      question: 'Are you vegetarian or non-vegetarian?',
+      options: [
+        { value: 'vegetarian', label: 'Vegetarian' },
+        { value: 'non_vegetarian', label: 'Non-vegetarian' },
+        { value: 'doesnt_matter', label: "Doesn't matter" }
+      ]
+    },
+    {
+      id: 'roomEnvironment',
+      question: 'How do you prefer your room environment?',
+      options: [
+        { value: 'quiet', label: 'Quiet and focused' },
+        { value: 'chill', label: 'Chill and casual' },
+        { value: 'doesnt_matter', label: "Doesn't matter" }
+      ]
+    },
+    {
+      id: 'lightsPreference',
+      question: 'Do you prefer keeping the lights on or off while sleeping?',
+      options: [
+        { value: 'off', label: 'Off' },
+        { value: 'dim', label: 'Dim light' },
+        { value: 'doesnt_matter', label: "Doesn't matter" }
       ]
     }
   ];

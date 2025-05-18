@@ -33,16 +33,25 @@ const MatchRequestsModal = ({ isOpen, onClose }) => {
         const match = docSnap.data();
         // Try to get compatibility score if available
         let compatibility = null;
+        let matchedUserName = '';
         try {
           const compatDoc = await getDoc(doc(db, 'compatibility', `${user.uid}_${match.userId}`));
           if (compatDoc.exists()) {
             compatibility = compatDoc.data().score;
           }
+          // Fetch matched user's name
+          const matchedUserDoc = await getDoc(doc(db, 'roomie-users', match.userId));
+          if (matchedUserDoc.exists()) {
+            matchedUserName = matchedUserDoc.data().name || match.userId;
+          } else {
+            matchedUserName = match.userId;
+          }
         } catch {}
         return {
           id: docSnap.id,
           ...match,
-          compatibility
+          compatibility,
+          matchedUserName
         };
       }));
       setAcceptedMatches(matchesData);
@@ -164,7 +173,7 @@ const MatchRequestsModal = ({ isOpen, onClose }) => {
               {acceptedMatches.map(match => (
                 <div key={match.id} className="border border-green-700/30 rounded-xl p-4 bg-gray-800/70 flex justify-between items-center">
                   <div>
-                    <h4 className="font-medium text-gray-200">{match.userId}</h4>
+                    <h4 className="font-medium text-gray-200">{match.matchedUserName}</h4>
                     <p className="text-sm text-gray-400">Matched {match.matchedAt ? new Date(match.matchedAt.seconds ? match.matchedAt.seconds * 1000 : match.matchedAt).toLocaleDateString() : ''}</p>
                   </div>
                   <div className="flex flex-col items-end">

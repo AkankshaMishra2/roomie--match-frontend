@@ -27,9 +27,27 @@ const ChatList = () => {
     );
   }
 
+  // Deduplicate chats by otherUser.id, keeping only the most recent chat per user
+  const uniqueChatsMap = new Map();
+  chats.forEach(chat => {
+    const userId = chat.otherUser.id;
+    if (!uniqueChatsMap.has(userId)) {
+      uniqueChatsMap.set(userId, chat);
+    } else {
+      // If already exists, keep the one with the latest lastMessageTime
+      const existing = uniqueChatsMap.get(userId);
+      const existingTime = existing.lastMessageTime ? existing.lastMessageTime.toMillis?.() || existing.lastMessageTime.getTime?.() || 0 : 0;
+      const newTime = chat.lastMessageTime ? chat.lastMessageTime.toMillis?.() || chat.lastMessageTime.getTime?.() || 0 : 0;
+      if (newTime > existingTime) {
+        uniqueChatsMap.set(userId, chat);
+      }
+    }
+  });
+  const uniqueChats = Array.from(uniqueChatsMap.values());
+
   return (
     <div className="h-full overflow-y-auto">
-      {chats.map((chat) => (
+      {uniqueChats.map((chat) => (
         <div
           key={chat.id}
           className={`p-4 border-b border-gray-800 cursor-pointer hover:bg-gray-800/50 transition-colors ${

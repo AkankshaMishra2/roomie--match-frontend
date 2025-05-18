@@ -11,7 +11,8 @@ import {
   doc as firestoreDoc,
   getDoc,
   getDocs,
-  setDoc
+  setDoc,
+  writeBatch
 } from 'firebase/firestore';
 import { db } from '../lib/firebase';
 import { useAuth } from '../hooks/useAuth';
@@ -24,6 +25,7 @@ export function ChatProvider({ children }) {
   const [activeChat, setActiveChat] = useState(null);
   const [messages, setMessages] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [unreadCount, setUnreadCount] = useState(0);
 
   // Fetch user's chats
   useEffect(() => {
@@ -93,6 +95,60 @@ export function ChatProvider({ children }) {
 
     return () => unsubscribe();
   }, [auth?.user, activeChat]);
+
+  // Listen for unread messages for the current user
+  useEffect(() => {
+    if (!auth?.user) return;
+    let unsubscribes = [];
+    let isMounted = true;
+    const chatsRef = collection(db, 'roomie-users', auth.user.uid, 'chats');
+    const q = query(chatsRef);
+    const unsubscribeChats = onSnapshot(q, async (snapshot) => {
+      let totalUnread = 0;
+      let chatDocs = snapshot.docs;
+      let processed = 0;
+      if (chatDocs.length === 0) {
+        if (isMounted) setUnreadCount(0);
+        return;
+      }
+      chatDocs.forEach(chatDoc => {
+        const messagesRef = collection(db, 'roomie-users', auth.user.uid, 'chats', chatDoc.id, 'messages');
+        const unreadQuery = query(messagesRef, where('receiverId', '==', auth.user.uid), where('read', '==', false));
+        const unsub = onSnapshot(unreadQuery, (unreadSnap) => {
+          totalUnread += unreadSnap.size;
+          processed++;
+          if (processed === chatDocs.length && isMounted) {
+            setUnreadCount(totalUnread);
+          }
+        });
+        unsubscribes.push(unsub);
+      });
+    });
+    return () => {
+      unsubscribes.forEach(unsub => unsub());
+      unsubscribeChats();
+      isMounted = false;
+    };
+  }, [auth?.user]);
+
+  // Mark all messages as read for the current user
+  const markAllMessagesAsRead = async () => {
+    if (!auth?.user) return;
+    const chatsRef = collection(db, 'roomie-users', auth.user.uid, 'chats');
+    const chatsSnapshot = await getDocs(chatsRef);
+    for (const chatDoc of chatsSnapshot.docs) {
+      const messagesRef = collection(db, 'roomie-users', auth.user.uid, 'chats', chatDoc.id, 'messages');
+      const unreadQuery = query(messagesRef, where('receiverId', '==', auth.user.uid), where('read', '==', false));
+      const unreadSnapshot = await getDocs(unreadQuery);
+      if (!unreadSnapshot.empty) {
+        const batch = writeBatch(db);
+        unreadSnapshot.forEach(msgDoc => {
+          batch.update(msgDoc.ref, { read: true });
+        });
+        await batch.commit();
+      }
+    }
+  };
 
   // Start a new chat
   const startChat = async (otherUserId) => {
@@ -228,7 +284,9 @@ export function ChatProvider({ children }) {
     loading,
     startChat,
     sendMessage,
-    markMessagesAsRead
+    markMessagesAsRead,
+    unreadCount,
+    markAllMessagesAsRead
   };
 
   return <ChatContext.Provider value={value}>{children}</ChatContext.Provider>;

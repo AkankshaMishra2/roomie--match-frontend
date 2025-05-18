@@ -47,7 +47,7 @@ export default function HomePage() {
     {
       name: "Taylor Chen",
       avatar: "/avatars/taylor.jpg",
-      content: "After three terrible roommate experiences, RoomieMatch finally helped me find someone compatible.",
+      content: "After three terrible roommate experiences, UniRooms finally helped me find someone compatible.",
       rating: 5,
       matchPercentage: 95
     }
@@ -81,7 +81,7 @@ export default function HomePage() {
   return (
     <Layout>
       <Head>
-        <title>RoomieMatch - Find Your Perfect Roommate</title>
+        <title>UniRooms - Find Your Perfect Roommate</title>
         <meta name="description" content="Find your ideal roommate based on personality matching and lifestyle compatibility" />
         <link rel="icon" href="/favicon.ico" />
         <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
@@ -121,11 +121,6 @@ export default function HomePage() {
                     Get Started <ArrowRight className="ml-2 h-5 w-5" />
                   </Link>
                 </Button>
-                <Button asChild variant="outline" size="lg" className="border-white/20 text-white hover:bg-white/10 px-6 py-6 text-lg rounded-full">
-                  <Link href="/about">
-                    Learn More
-                  </Link>
-                </Button>
               </div>
             </div>
 
@@ -153,7 +148,7 @@ export default function HomePage() {
             <div 
               className="text-center mb-16"
             >
-              <h2 className="text-3xl md:text-5xl font-bold text-white mb-4 font-outfit">How RoomieMatch Works</h2>
+              <h2 className="text-3xl md:text-5xl font-bold text-white mb-4 font-outfit">How UniRooms Works</h2>
               <p className="text-xl text-gray-300 max-w-2xl mx-auto font-light">
                 Our scientifically-backed approach to roommate matching ensures greater compatibility and happier living situations.
               </p>
@@ -182,58 +177,66 @@ export default function HomePage() {
         {/* Process Steps */}
         <section className="relative py-20">
           <div className="container mx-auto px-4 sm:px-6 lg:px-8">
-            <div 
-              className="text-center mb-16"
-            >
+            <div className="text-center mb-16">
               <h2 className="text-3xl md:text-5xl font-bold text-white mb-4 font-outfit">Simple 3-Step Process</h2>
               <p className="text-xl text-gray-300 max-w-2xl mx-auto font-light">
                 Finding your perfect roommate has never been easier
               </p>
             </div>
 
-            <div 
-              className="grid grid-cols-1 md:grid-cols-3 gap-6 relative"
-            >
-              {/* Connection lines between steps (desktop only) */}
-              <div className="absolute top-1/2 left-0 right-0 h-0.5 bg-gradient-to-r from-pink-500 to-purple-600 hidden md:block"></div>
-              
-              <div>
-                <div className="relative flex flex-col items-center text-center p-8 z-10">
-                  <div className="bg-gradient-to-br from-pink-500 to-purple-600 rounded-full h-16 w-16 flex items-center justify-center text-2xl font-bold mb-6 relative">
-                    <div className="absolute inset-0 rounded-full bg-gradient-to-br from-pink-500 to-purple-600 animate-pulse opacity-50 blur-md"></div>
-                    <span>1</span>
-                  </div>
-                  <h3 className="text-2xl font-bold text-white mb-4 font-outfit">Take the Quiz</h3>
-                  <p className="text-gray-300">
-                    Complete our personality quiz to help us understand your living preferences, habits, and personality traits.
-                  </p>
+            {/* Circles and connecting line */}
+            <div className="relative w-full mx-auto max-w-4xl h-40 flex items-center justify-between">
+              {/* Connection line between steps (desktop only) */}
+              <div className="hidden md:block absolute left-0 right-0 top-1/2 h-1 bg-gradient-to-r from-pink-500 to-purple-600 z-0"></div>
+              {/* Glowing dots at each step (desktop only) */}
+              <div className="hidden md:block absolute top-1/2 left-[16.66%] -translate-y-1/2 z-10">
+                <div className="h-4 w-4 rounded-full bg-gradient-to-br from-pink-500 to-purple-600 shadow-lg shadow-pink-500/40 border-4 border-black"></div>
+              </div>
+              <div className="hidden md:block absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-10">
+                <div className="h-4 w-4 rounded-full bg-gradient-to-br from-pink-500 to-purple-600 shadow-lg shadow-pink-500/40 border-4 border-black"></div>
+              </div>
+              <div className="hidden md:block absolute top-1/2 right-[16.66%] -translate-y-1/2 z-10">
+                <div className="h-4 w-4 rounded-full bg-gradient-to-br from-pink-500 to-purple-600 shadow-lg shadow-pink-500/40 border-4 border-black"></div>
+              </div>
+              {/* Step Circles */}
+              <div className="flex-1 flex justify-center z-20">
+                <div className="bg-gradient-to-br from-pink-500 to-purple-600 rounded-full h-20 w-20 flex items-center justify-center text-3xl font-bold relative">
+                  <div className="absolute inset-0 rounded-full bg-gradient-to-br from-pink-500 to-purple-600 animate-pulse opacity-50 blur-md"></div>
+                  <span>1</span>
                 </div>
               </div>
-
-              <div>
-                <div className="relative flex flex-col items-center text-center p-8 z-10">
-                  <div className="bg-gradient-to-br from-pink-500 to-purple-600 rounded-full h-16 w-16 flex items-center justify-center text-2xl font-bold mb-6 relative">
-                    <div className="absolute inset-0 rounded-full bg-gradient-to-br from-pink-500 to-purple-600 animate-pulse opacity-50 blur-md"></div>
-                    <span>2</span>
-                  </div>
-                  <h3 className="text-2xl font-bold text-white mb-4 font-outfit">Browse Matches</h3>
-                  <p className="text-gray-300">
-                    Review your personalized matches ranked by compatibility scores and detailed personality insights.
-                  </p>
+              <div className="flex-1 flex justify-center z-20">
+                <div className="bg-gradient-to-br from-pink-500 to-purple-600 rounded-full h-20 w-20 flex items-center justify-center text-3xl font-bold relative">
+                  <div className="absolute inset-0 rounded-full bg-gradient-to-br from-pink-500 to-purple-600 animate-pulse opacity-50 blur-md"></div>
+                  <span>2</span>
                 </div>
               </div>
-
-              <div>
-                <div className="relative flex flex-col items-center text-center p-8 z-10">
-                  <div className="bg-gradient-to-br from-pink-500 to-purple-600 rounded-full h-16 w-16 flex items-center justify-center text-2xl font-bold mb-6 relative">
-                    <div className="absolute inset-0 rounded-full bg-gradient-to-br from-pink-500 to-purple-600 animate-pulse opacity-50 blur-md"></div>
-                    <span>3</span>
-                  </div>
-                  <h3 className="text-2xl font-bold text-white mb-4 font-outfit">Connect Safely</h3>
-                  <p className="text-gray-300">
-                    Message potential roommates through our platform and schedule meetings when you're ready.
-                  </p>
+              <div className="flex-1 flex justify-center z-20">
+                <div className="bg-gradient-to-br from-pink-500 to-purple-600 rounded-full h-20 w-20 flex items-center justify-center text-3xl font-bold relative">
+                  <div className="absolute inset-0 rounded-full bg-gradient-to-br from-pink-500 to-purple-600 animate-pulse opacity-50 blur-md"></div>
+                  <span>3</span>
                 </div>
+              </div>
+            </div>
+            {/* Step Titles and Descriptions */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-8 mt-8 max-w-4xl mx-auto">
+              <div className="text-center">
+                <h3 className="text-2xl font-bold text-white mb-4 font-outfit">Take the Quiz</h3>
+                <p className="text-gray-300">
+                  Complete our personality quiz to help us understand your living preferences, habits, and personality traits.
+                </p>
+              </div>
+              <div className="text-center">
+                <h3 className="text-2xl font-bold text-white mb-4 font-outfit">Browse Matches</h3>
+                <p className="text-gray-300">
+                  Review your personalized matches ranked by compatibility scores and detailed personality insights.
+                </p>
+              </div>
+              <div className="text-center">
+                <h3 className="text-2xl font-bold text-white mb-4 font-outfit">Connect Safely</h3>
+                <p className="text-gray-300">
+                  Message potential roommates through our platform and schedule meetings when you're ready.
+                </p>
               </div>
             </div>
           </div>
@@ -309,7 +312,7 @@ export default function HomePage() {
                 <div className="relative z-10 flex flex-col items-center text-center">
                   <h2 className="text-3xl md:text-4xl font-bold mb-6 font-outfit text-white">Ready to Find Your <span className="bg-clip-text text-transparent bg-gradient-to-r from-pink-500 to-purple-600">Perfect Roommate</span>?</h2>
                   <p className="text-xl text-gray-300 mb-10 max-w-2xl">
-                    Join RoomieMatch today and start your journey to better living.
+                    Join UniRooms today and start your journey to better living.
                   </p>
                   <Button asChild size="lg" className="bg-gradient-to-r from-pink-500 to-purple-600 hover:from-pink-600 hover:to-purple-700 text-white rounded-full shadow-xl shadow-pink-900/20">
                     <Link href="/auth/signup" className="flex items-center px-8 py-6 text-lg">

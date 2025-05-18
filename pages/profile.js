@@ -3,6 +3,7 @@ import { useAuth } from '../hooks/useAuth';
 import { doc, getDoc, updateDoc } from 'firebase/firestore';
 import { db } from '../lib/firebase';
 import { useRouter } from 'next/router';
+import { getStorage, ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 
 export default function ProfilePage() {
   const { user } = useAuth();
@@ -138,19 +139,19 @@ export default function ProfilePage() {
         <h2 className="text-3xl font-bold text-pink-400 mb-6 text-center">Update Your Profile</h2>
         <form onSubmit={handleSubmit} className="space-y-5">
           <div className="flex flex-col items-center mb-4">
-            <img
-              src={form.photoURL || '/images/default-avatar.png'}
-              alt="Profile"
-              className="w-24 h-24 rounded-full border-4 border-pink-500 object-cover mb-2 shadow-lg"
-            />
-            <input
-              type="text"
-              name="photoURL"
-              value={form.photoURL}
-              onChange={handleChange}
-              placeholder="Photo URL"
-              className="mt-2 w-full bg-gray-800 border border-gray-700 rounded-lg px-4 py-2 text-gray-200 focus:outline-none focus:ring-2 focus:ring-pink-500"
-            />
+            {form.photoURL ? (
+              <img
+                src={form.photoURL}
+                alt="Profile"
+                className="w-24 h-24 rounded-full border-4 border-pink-500 object-cover mb-2 shadow-lg"
+              />
+            ) : (
+              <div className="w-24 h-24 rounded-full border-4 border-pink-500 bg-gray-700 flex items-center justify-center mb-2 shadow-lg text-3xl text-pink-200">
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-12 w-12" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                </svg>
+              </div>
+            )}
           </div>
           <div>
             <label className="block text-pink-200 mb-1">Name</label>

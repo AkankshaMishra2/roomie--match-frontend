@@ -3,7 +3,7 @@ import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/router';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Menu, X, User, Moon, Sun, Bell, MessageSquare, Search, LogOut } from 'lucide-react';
+import { Menu, X, User, Bell, MessageSquare, Search, LogOut } from 'lucide-react';
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import {
@@ -15,30 +15,82 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Badge } from "@/components/ui/badge";
-import { useAuth } from '@/hooks/useAuth'; // Import AuthContext
+import { useAuth } from '@/hooks/useAuth';
+import { collection, query, where, onSnapshot, getDocs } from 'firebase/firestore';
+import { db } from '@/lib/firebase';
+import { useChat } from '../../contexts/ChatContext';
+import { useNotifications } from '../../contexts/NotificationContext';
 
 export default function Navbar() {
   const [isScrolled, setIsScrolled] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
-  const [isDarkMode, setIsDarkMode] = useState(true); // Default to dark mode
   const router = useRouter();
-  
-  // Use auth context instead of a dummy user
-  const { user, signOut } = useAuth(); // Get user and signOut from auth context
+  const { user, signOut } = useAuth();
+  const [notificationsOpen, setNotificationsOpen] = useState(false);
+  const [notifications, setNotifications] = useState([]);
+  const [unreadMessages, setUnreadMessages] = useState(0);
+  const [readMessageIds, setReadMessageIds] = useState(new Set());
+  const [readNotificationIds, setReadNotificationIds] = useState(new Set());
+  const { unreadCount, markAllMessagesAsRead } = useChat();
+  const { unreadNotificationCount, markAllNotificationsAsRead, notifications: contextNotifications } = useNotifications();
 
   const handleSignOut = async () => {
     try {
       await signOut();
-      router.push('/'); // Redirect to home page after sign out
+      router.push('/');
     } catch (error) {
       console.error("Error signing out:", error);
     }
   };
 
-  const toggleDarkMode = () => {
-    setIsDarkMode(prev => !prev);
-    // In a real implementation, you would update the document class or a theme context
+  const handleNotificationsClick = async () => {
+    setNotificationsOpen(v => !v);
+    // Mark notifications as read when opened
+    if (!notificationsOpen && notifications.length > 0) {
+      const newReadIds = new Set([...readNotificationIds]);
+      notifications.forEach(notif => {
+        newReadIds.add(notif.id);
+      });
+      setReadNotificationIds(newReadIds);
+      setNotifications([]);
+    }
   };
+
+  const handleMessagesClick = async () => {
+    // Mark messages as read when clicked
+    if (unreadMessages > 0) {
+      const newReadIds = new Set([...readMessageIds]);
+      notifications
+        .filter(n => n.type === 'message')
+        .forEach(msg => {
+          newReadIds.add(msg.id);
+        });
+      setReadMessageIds(newReadIds);
+      setUnreadMessages(0);
+    }
+  };
+
+  // Load read status from localStorage on component mount
+  useEffect(() => {
+    if (user) {
+      const savedReadMessages = localStorage.getItem(`readMessages_${user.uid}`);
+      const savedReadNotifications = localStorage.getItem(`readNotifications_${user.uid}`);
+      if (savedReadMessages) {
+        setReadMessageIds(new Set(JSON.parse(savedReadMessages)));
+      }
+      if (savedReadNotifications) {
+        setReadNotificationIds(new Set(JSON.parse(savedReadNotifications)));
+      }
+    }
+  }, [user]);
+
+  // Save read status to localStorage when it changes
+  useEffect(() => {
+    if (user) {
+      localStorage.setItem(`readMessages_${user.uid}`, JSON.stringify([...readMessageIds]));
+      localStorage.setItem(`readNotifications_${user.uid}`, JSON.stringify([...readNotificationIds]));
+    }
+  }, [readMessageIds, readNotificationIds, user]);
 
   // Change navbar style on scroll
   useEffect(() => {
@@ -58,6 +110,65 @@ export default function Navbar() {
   useEffect(() => {
     setIsMobileMenuOpen(false);
   }, [router.pathname]);
+
+  useEffect(() => {
+    if (!user) return;
+    // Listen for match requests
+    const requestsQuery = query(
+      collection(db, 'roomie-users', user.uid, 'match-requests'),
+      where('status', '==', 'pending')
+    );
+    const unsubscribeRequests = onSnapshot(requestsQuery, (snapshot) => {
+      const reqs = snapshot.docs
+        .map(doc => ({
+          id: doc.id,
+          type: 'match-request',
+          ...doc.data()
+        }))
+        .filter(req => !readNotificationIds.has(req.id));
+      setNotifications((prev) => [
+        ...prev.filter(n => n.type !== 'match-request'),
+        ...reqs
+      ]);
+    });
+    // Listen for unread messages (per chat)
+    const chatsQuery = query(collection(db, 'roomie-users', user.uid, 'chats'));
+    const unsubscribeChats = onSnapshot(chatsQuery, async (snapshot) => {
+      let msgs = [];
+      let totalUnread = 0;
+      for (const chatDoc of snapshot.docs) {
+        const chatData = chatDoc.data();
+        const otherUserId = chatData.participants.find(id => id !== user.uid);
+        if (!otherUserId) continue;
+        const messagesQuery = query(
+          collection(db, 'roomie-users', otherUserId, 'chats', chatDoc.id, 'messages'),
+          where('receiverId', '==', user.uid),
+          where('read', '==', false)
+        );
+        const unreadSnap = await getDocs(messagesQuery);
+        const unreadMessages = unreadSnap.docs
+          .map(doc => ({
+            id: doc.id,
+            type: 'message',
+            ...doc.data(),
+            chatId: chatDoc.id
+          }))
+          .filter(msg => !readMessageIds.has(msg.id));
+        
+        totalUnread += unreadMessages.length;
+        msgs.push(...unreadMessages);
+      }
+      setUnreadMessages(totalUnread);
+      setNotifications((prev) => [
+        ...prev.filter(n => n.type !== 'message'),
+        ...msgs
+      ]);
+    });
+    return () => {
+      unsubscribeRequests();
+      unsubscribeChats();
+    };
+  }, [user, readMessageIds, readNotificationIds]);
 
   // Animation variants
   const navbarVariants = {
@@ -122,31 +233,20 @@ export default function Navbar() {
   const navLinks = [
     { title: 'Home', path: '/' },
     { title: 'Find Roommates', path: '/roommates' },
-    { title: 'How It Works', path: '/how-it-works' },
-    { title: 'Pricing', path: '/pricing' },
+    { title: 'About', path: '/about' },
   ];
 
-  // Get background color based on scroll state and dark mode
+  // Get background color based on scroll state
   const getNavbarBg = () => {
-    if (isDarkMode) {
-      if (isScrolled || isMobileMenuOpen) {
-        return 'bg-black/95 backdrop-blur-md border-b border-pink-600/10';
-      }
-      return 'bg-transparent';
+    if (isScrolled || isMobileMenuOpen) {
+      return 'bg-black/95 backdrop-blur-md border-b border-pink-600/10';
     }
-    return isScrolled || isMobileMenuOpen ? 'bg-white/95 backdrop-blur-sm' : 'bg-transparent';
+    return 'bg-transparent';
   };
 
-  // Get text color based on scroll state and dark mode
+  // Get text color based on scroll state
   const getTextColor = (isActive = false) => {
-    if (isDarkMode) {
-      return isActive ? 'text-pink-500' : 'text-gray-300 hover:text-pink-500';
-    }
-    
-    if (isScrolled || isMobileMenuOpen) {
-      return isActive ? 'text-indigo-700' : 'text-gray-700 hover:text-indigo-700';
-    }
-    return isActive ? 'text-white' : 'text-white/90 hover:text-white';
+    return isActive ? 'text-pink-500' : 'text-gray-300 hover:text-pink-500';
   };
 
   return (
@@ -156,10 +256,8 @@ export default function Navbar() {
       initial="hidden"
       animate="visible"
     >
-      {/* Gradient accent that rises from the bottom in dark mode */}
-      {isDarkMode && (
-        <div className="absolute bottom-0 left-0 right-0 h-px bg-gradient-to-r from-pink-600/30 via-purple-600/30 to-pink-600/30"></div>
-      )}
+      {/* Gradient accent that rises from the bottom */}
+      <div className="absolute bottom-0 left-0 right-0 h-px bg-gradient-to-r from-pink-600/30 via-purple-600/30 to-pink-600/30"></div>
       
       <div className="container mx-auto px-4 sm:px-6 lg:px-8 relative">
         <div className="flex items-center justify-between h-16 md:h-20">
@@ -171,12 +269,8 @@ export default function Navbar() {
             whileHover="hover"
           >
             <Link href="/" className="flex items-center">
-              <span className={`text-xl font-bold ${
-                isDarkMode 
-                  ? 'bg-clip-text text-transparent bg-gradient-to-r from-pink-500 to-purple-600' 
-                  : isScrolled ? 'text-indigo-700' : 'text-white'
-              } transition-all duration-300`}>
-                RoomieMatch
+              <span className="text-xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-pink-500 to-purple-600 transition-all duration-300">
+                UniRooms
               </span>
             </Link>
           </motion.div>
@@ -194,387 +288,153 @@ export default function Navbar() {
                   }`}
                 >
                   {link.title}
-                  {router.pathname === link.path && isDarkMode && (
+                  {router.pathname === link.path && (
                     <motion.span 
                       className="absolute -bottom-1 left-0 w-full h-0.5 rounded-full bg-gradient-to-r from-pink-500 to-purple-600"
                       layoutId="underline"
-                      transition={{ type: "spring", stiffness: 300, damping: 30 }}
-                    />
-                  )}
-                  {router.pathname === link.path && !isDarkMode && (
-                    <motion.span 
-                      className="absolute -bottom-1 left-0 w-full h-0.5 rounded-full bg-indigo-700"
-                      layoutId="underline"
-                      transition={{ type: "spring", stiffness: 300, damping: 30 }}
                     />
                   )}
                 </Link>
               </motion.div>
             ))}
-
-            {/* Search Button */}
-            <motion.div whileHover="hover" whileTap="tap" variants={buttonVariants}>
-              <Button 
-                variant="ghost" 
-                size="icon" 
-                className={`rounded-full ${
-                  isDarkMode ? 'text-gray-300 hover:text-pink-500 hover:bg-gray-900' : 
-                  (isScrolled ? 'text-gray-700 hover:bg-gray-100' : 'text-white hover:bg-white/10')
-                }`}
-              >
-                <Search size={18} />
-              </Button>
-            </motion.div>
           </nav>
 
-          {/* Desktop Auth Buttons & User Menu */}
-          <div className="hidden md:flex items-center space-x-3">
-            {/* Theme Toggle */}
-            <motion.div whileHover="hover" whileTap="tap" variants={buttonVariants}>
-              <Button 
-                variant="ghost" 
-                size="icon" 
-                onClick={toggleDarkMode}
-                className={`rounded-full ${
-                  isDarkMode ? 'text-gray-300 hover:text-pink-500 hover:bg-gray-900' : 
-                  (isScrolled ? 'text-gray-700 hover:bg-gray-100' : 'text-white hover:bg-white/10')
-                }`}
-              >
-                {isDarkMode ? <Sun size={18} /> : <Moon size={18} />}
-              </Button>
-            </motion.div>
-
+          {/* Right side buttons */}
+          <div className="flex items-center space-x-4">
             {user ? (
-              <div className="flex items-center space-x-3">
-                <motion.div whileHover="hover" whileTap="tap" variants={buttonVariants}>
-                  <Button 
-                    variant="ghost" 
-                    size="icon" 
-                    className={`rounded-full relative ${
-                      isDarkMode ? 'text-gray-300 hover:text-pink-500 hover:bg-gray-900' : 
-                      (isScrolled ? 'text-gray-700 hover:bg-gray-100' : 'text-white hover:bg-white/10')
-                    }`}
-                  >
-                    <Bell size={18} />
-                    <span className="absolute -top-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full bg-gradient-to-r from-pink-500 to-purple-600 text-xs text-white">
-                      3
-                    </span>
+              <>
+                <motion.div variants={buttonVariants} whileHover="hover" whileTap="tap">
+                  <Link href="/messages" onClick={markAllMessagesAsRead}>
+                    <Button variant="ghost" size="icon" className="relative">
+                      <MessageSquare className="h-5 w-5" />
+                      {unreadCount > 0 && (
+                        <Badge className="absolute -top-1 -right-1 h-4 w-4 p-0 flex items-center justify-center bg-pink-500">
+                          {unreadCount}
+                        </Badge>
+                      )}
+                    </Button>
+                  </Link>
+                </motion.div>
+
+                <motion.div variants={buttonVariants} whileHover="hover" whileTap="tap" className="relative">
+                  <Button variant="ghost" size="icon" className="relative" onClick={markAllNotificationsAsRead}>
+                    <Bell className="h-5 w-5" />
+                    {unreadNotificationCount > 0 && (
+                      <Badge className="absolute -top-1 -right-1 h-4 w-4 p-0 flex items-center justify-center bg-pink-500">
+                        {unreadNotificationCount}
+                      </Badge>
+                    )}
                   </Button>
                 </motion.div>
-                
-                <motion.div whileHover="hover" whileTap="tap" variants={buttonVariants}>
-                  <Button 
-                    variant="ghost" 
-                    size="icon" 
-                    className={`rounded-full relative ${
-                      isDarkMode ? 'text-gray-300 hover:text-pink-500 hover:bg-gray-900' : 
-                      (isScrolled ? 'text-gray-700 hover:bg-gray-100' : 'text-white hover:bg-white/10')
-                    }`}
-                  >
-                    <MessageSquare size={18} />
-                    <span className="absolute -top-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full bg-gradient-to-r from-pink-500 to-purple-600 text-xs text-white">
-                      2
-                    </span>
-                  </Button>
-                </motion.div>
-                
+
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
-                    <motion.div whileHover="hover" whileTap="tap" variants={buttonVariants}>
-                      <Button 
-                        variant="ghost" 
-                        className={`rounded-full p-0 h-9 w-9 overflow-hidden ring-2 ${
-                          isDarkMode 
-                            ? 'ring-gray-800 hover:ring-pink-500/50' 
-                            : 'ring-transparent hover:ring-indigo-300'
-                        } transition-colors`}
-                      >
-                        <Avatar>
-                          <AvatarImage src={user?.photoURL || ""} alt={user?.displayName || "User"} />
-                          <AvatarFallback className={
-                            isDarkMode ? "bg-gray-900 text-pink-500" : "bg-indigo-100 text-indigo-700"
-                          }>
-                            {user?.displayName ? user.displayName[0].toUpperCase() : <User size={16} />}
-                          </AvatarFallback>
-                        </Avatar>
-                      </Button>
-                    </motion.div>
+                    <Button variant="ghost" className="relative h-8 w-8 rounded-full bg-white/10 hover:bg-white/20">
+                      <Avatar className="h-8 w-8 border-2 border-pink-500">
+                        <AvatarImage src={user.photoURL} alt={user.displayName} />
+                        <AvatarFallback className="bg-gradient-to-r from-pink-500 to-purple-600 text-white font-semibold text-lg">
+                          {user.displayName?.[0]?.toUpperCase() || '?'}
+                        </AvatarFallback>
+                      </Avatar>
+                    </Button>
                   </DropdownMenuTrigger>
-                  <DropdownMenuContent align="end" className={`w-56 ${isDarkMode ? 'bg-gray-950 text-gray-200 border-gray-800' : ''}`}>
-                    <DropdownMenuLabel>My Account</DropdownMenuLabel>
-                    <DropdownMenuSeparator className={isDarkMode ? "bg-gray-800" : ""} />
-                    <DropdownMenuItem asChild className={isDarkMode ? "hover:bg-gray-900 focus:bg-gray-900 hover:text-pink-500" : ""}>
-                      <Link href="/dashboard">Dashboard</Link>
+                  <DropdownMenuContent className="w-56 bg-gray-900 text-white border border-pink-700/30" align="end" forceMount>
+                    <DropdownMenuLabel className="font-normal">
+                      <div className="flex flex-col space-y-1">
+                        <p className="text-sm font-medium leading-none">{user.displayName}</p>
+                        <p className="text-xs leading-none text-muted-foreground">
+                          {user.email}
+                        </p>
+                      </div>
+                    </DropdownMenuLabel>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem asChild>
+                      <Link href="/profile">
+                        <User className="mr-2 h-4 w-4" />
+                        <span>Profile</span>
+                      </Link>
                     </DropdownMenuItem>
-                    <DropdownMenuItem asChild className={isDarkMode ? "hover:bg-gray-900 focus:bg-gray-900 hover:text-pink-500" : ""}>
-                      <Link href="/profile">Profile</Link>
+                    <DropdownMenuItem asChild>
+                      <Link href="/dashboard">
+                        <Search className="mr-2 h-4 w-4" />
+                        <span>Dashboard</span>
+                      </Link>
                     </DropdownMenuItem>
-                    <DropdownMenuItem asChild className={isDarkMode ? "hover:bg-gray-900 focus:bg-gray-900 hover:text-pink-500" : ""}>
-                      <Link href="/matches">My Matches</Link>
-                    </DropdownMenuItem>
-                    <DropdownMenuItem asChild className={isDarkMode ? "hover:bg-gray-900 focus:bg-gray-900 hover:text-pink-500" : ""}>
-                      <Link href="/chat">Messages</Link>
-                    </DropdownMenuItem>
-                    <DropdownMenuSeparator className={isDarkMode ? "bg-gray-800" : ""} />
-                    <DropdownMenuItem onClick={handleSignOut} className={isDarkMode ? "hover:bg-gray-900 focus:bg-gray-900 text-pink-500" : "text-red-600"}>
-                      Log Out
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem onClick={handleSignOut}>
+                      <LogOut className="mr-2 h-4 w-4" />
+                      <span>Log out</span>
                     </DropdownMenuItem>
                   </DropdownMenuContent>
                 </DropdownMenu>
-                
-                {/* New Sign Out Button */}
-                <motion.div whileHover="hover" whileTap="tap" variants={buttonVariants}>
-                  <Button 
-                    variant="ghost"
-                    onClick={handleSignOut}
-                    className={
-                      isDarkMode 
-                        ? 'border border-gray-800 hover:border-pink-500/30 hover:bg-gray-900 text-pink-500' 
-                        : (isScrolled ? 'border border-red-100 text-red-600 hover:bg-red-50' : 'border-white/30 text-white hover:bg-white/10')
-                    }
-                  >
-                    <LogOut size={16} className="mr-2" />
-                    Sign Out
-                  </Button>
+              </>
+            ) : (
+              <div className="flex items-center space-x-4">
+                <motion.div variants={buttonVariants} whileHover="hover" whileTap="tap">
+                  <Link href="/auth/signin">
+                    <Button variant="ghost" className="text-sm">
+                      Sign In
+                    </Button>
+                  </Link>
+                </motion.div>
+                <motion.div variants={buttonVariants} whileHover="hover" whileTap="tap">
+                  <Link href="/auth/signup">
+                    <Button className="bg-gradient-to-r from-pink-500 to-purple-600 text-white text-sm">
+                      Sign Up
+                    </Button>
+                  </Link>
                 </motion.div>
               </div>
-            ) : (
-              <>
-                <motion.div whileHover="hover" whileTap="tap" variants={buttonVariants}>
-                  <Button 
-                    asChild 
-                    variant="ghost"
-                    className={
-                      isDarkMode 
-                        ? 'border border-gray-800 hover:border-pink-500/30 hover:bg-gray-900 text-gray-300 hover:text-pink-500' 
-                        : (isScrolled ? 'border hover:bg-gray-100' : 'border-white/30 text-white hover:bg-white/10')
-                    }
-                  >
-                    <Link href="/auth/signin">Sign In</Link>
-                  </Button>
-                </motion.div>
-                <motion.div whileHover="hover" whileTap="tap" variants={buttonVariants}>
-                  <Button 
-                    asChild 
-                    className={
-                      isDarkMode 
-                        ? 'bg-gradient-to-r from-pink-500 to-purple-600 hover:from-pink-600 hover:to-purple-700 text-white border-0' 
-                        : (isScrolled ? '' : 'bg-white text-indigo-700 hover:bg-white/90')
-                    }
-                  >
-                    <Link href="/auth/signup">Sign Up</Link>
-                  </Button>
-                </motion.div>
-              </>
             )}
-          </div>
 
-          {/* Mobile Menu Button */}
-          <motion.button
-            className="md:hidden"
-            onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
-            aria-label="Toggle menu"
-            whileHover={{ scale: 1.1 }}
-            whileTap={{ scale: 0.9 }}
-          >
-            <AnimatePresence mode="wait" initial={false}>
-              <motion.div
-                key={isMobileMenuOpen ? "close" : "menu"}
-                initial={{ opacity: 0, rotate: -90 }}
-                animate={{ opacity: 1, rotate: 0 }}
-                exit={{ opacity: 0, rotate: 90 }}
-                transition={{ duration: 0.2 }}
+            {/* Mobile menu button */}
+            <motion.div 
+              className="md:hidden"
+              variants={buttonVariants}
+              whileHover="hover"
+              whileTap="tap"
+            >
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
               >
                 {isMobileMenuOpen ? (
-                  <X className={
-                    isDarkMode 
-                      ? "text-pink-500" 
-                      : (isScrolled || isMobileMenuOpen ? "text-gray-900" : "text-white")
-                  } size={24} />
+                  <X className="h-6 w-6" />
                 ) : (
-                  <Menu className={
-                    isDarkMode 
-                      ? "text-gray-300" 
-                      : (isScrolled || isMobileMenuOpen ? "text-gray-900" : "text-white")
-                  } size={24} />
+                  <Menu className="h-6 w-6" />
                 )}
-              </motion.div>
-            </AnimatePresence>
-          </motion.button>
+              </Button>
+            </motion.div>
+          </div>
         </div>
       </div>
 
-      {/* Mobile Menu */}
+      {/* Mobile menu */}
       <AnimatePresence>
         {isMobileMenuOpen && (
           <motion.div
-            className={`md:hidden overflow-hidden ${isDarkMode ? 'bg-black border-t border-gray-900 shadow-lg shadow-pink-900/10' : 'bg-white shadow-lg'}`}
+            className="md:hidden"
             variants={mobileMenuVariants}
             initial="closed"
             animate="open"
             exit="closed"
           >
-            <div className="px-4 py-2">
-              <nav className="flex flex-col space-y-1 py-4">
-                {navLinks.map((link) => (
-                  <motion.div
-                    key={link.path}
-                    variants={mobileMenuItemVariants}
-                    whileHover={{ x: 5 }}
-                    transition={{ type: "spring", stiffness: 300, damping: 30 }}
+            <div className="px-2 pt-2 pb-3 space-y-1 bg-black/95 backdrop-blur-md border-t border-pink-600/10">
+              {navLinks.map((link) => (
+                <motion.div key={link.path} variants={mobileMenuItemVariants}>
+                  <Link
+                    href={link.path}
+                    className={`block px-3 py-2 rounded-md text-base font-medium ${
+                      router.pathname === link.path
+                        ? 'text-pink-500'
+                        : 'text-gray-300 hover:text-pink-500'
+                    }`}
                   >
-                    <Link
-                      href={link.path}
-                      className={`block px-3 py-3 text-base font-medium rounded-md ${
-                        router.pathname === link.path
-                          ? (isDarkMode ? 'text-pink-500 bg-gray-900/50' : 'text-indigo-700 bg-indigo-50')
-                          : (isDarkMode ? 'text-gray-300 hover:text-pink-500 hover:bg-gray-900/50' : 'text-gray-700 hover:text-indigo-700 hover:bg-indigo-50/50')
-                      } transition-all duration-200`}
-                      onClick={() => setIsMobileMenuOpen(false)}
-                    >
-                      {link.title}
-                    </Link>
-                  </motion.div>
-                ))}
-
-                {/* Mobile Search */}
-                <motion.div
-                  variants={mobileMenuItemVariants}
-                  className="mt-2 pt-2 border-t border-gray-800"
-                >
-                  <div className={`flex items-center px-3 py-3 rounded-md ${isDarkMode ? 'bg-gray-900' : 'bg-gray-100'}`}>
-                    <Search size={18} className={isDarkMode ? 'text-pink-500' : 'text-gray-500'} />
-                    <input 
-                      type="text" 
-                      placeholder="Search..." 
-                      className={`ml-2 bg-transparent border-none outline-none w-full ${isDarkMode ? 'text-white placeholder-gray-500' : 'text-gray-900 placeholder-gray-500'}`}
-                    />
-                  </div>
+                    {link.title}
+                  </Link>
                 </motion.div>
-
-                <div className={`pt-4 mt-4 border-t ${isDarkMode ? 'border-gray-800' : 'border-gray-200'}`}>
-                  {user ? (
-                    <>
-                      <motion.div variants={mobileMenuItemVariants} className="flex items-center space-x-3 px-3 py-3">
-                        <Avatar className="h-10 w-10 ring-2 ring-pink-500/20">
-                          <AvatarImage src={user.photoURL || ""} alt={user.displayName || "User"} />
-                          <AvatarFallback className={isDarkMode ? "bg-gray-900 text-pink-500" : "bg-indigo-100 text-indigo-700"}>
-                            {user.displayName ? user.displayName[0].toUpperCase() : <User size={18} />}
-                          </AvatarFallback>
-                        </Avatar>
-                        <div>
-                          <div className={`font-medium ${isDarkMode ? 'text-white' : ''}`}>{user.displayName || "User"}</div>
-                          <div className={`text-sm ${isDarkMode ? 'text-gray-400' : 'text-gray-500'}`}>{user.email}</div>
-                        </div>
-                      </motion.div>
-                      
-                      <motion.div variants={mobileMenuItemVariants} whileHover={{ x: 5 }}>
-                        <Link
-                          href="/dashboard"
-                          className={`block px-3 py-3 text-base font-medium rounded-md ${
-                            isDarkMode ? 'text-gray-300 hover:text-pink-500 hover:bg-gray-900/50' : 'text-gray-700 hover:text-indigo-700 hover:bg-indigo-50/50'
-                          } transition-all duration-200`}
-                        >
-                          Dashboard
-                        </Link>
-                      </motion.div>
-                      
-                      <motion.div variants={mobileMenuItemVariants} whileHover={{ x: 5 }}>
-                        <Link
-                          href="/profile"
-                          className={`block px-3 py-3 text-base font-medium rounded-md ${
-                            isDarkMode ? 'text-gray-300 hover:text-pink-500 hover:bg-gray-900/50' : 'text-gray-700 hover:text-indigo-700 hover:bg-indigo-50/50'
-                          } transition-all duration-200`}
-                        >
-                          Profile
-                        </Link>
-                      </motion.div>
-                      
-                      <motion.div variants={mobileMenuItemVariants} whileHover={{ x: 5 }}>
-                        <Link
-                          href="/matches"
-                          className={`block px-3 py-3 text-base font-medium rounded-md ${
-                            isDarkMode ? 'text-gray-300 hover:text-pink-500 hover:bg-gray-900/50' : 'text-gray-700 hover:text-indigo-700 hover:bg-indigo-50/50'
-                          } transition-all duration-200 flex justify-between items-center`}
-                        >
-                          <span>My Matches</span>
-                          <Badge className={isDarkMode ? "bg-gray-900 text-pink-500 border border-pink-500/30" : "bg-indigo-100 text-indigo-700"}>New</Badge>
-                        </Link>
-                      </motion.div>
-                      
-                      <motion.div variants={mobileMenuItemVariants} whileHover={{ x: 5 }}>
-                        <Link
-                          href="/chat"
-                          className={`block px-3 py-3 text-base font-medium rounded-md ${
-                            isDarkMode ? 'text-gray-300 hover:text-pink-500 hover:bg-gray-900/50' : 'text-gray-700 hover:text-indigo-700 hover:bg-indigo-50/50'
-                          } transition-all duration-200 flex justify-between items-center`}
-                        >
-                          <span>Messages</span>
-                          <Badge className={isDarkMode ? "bg-pink-500/20 text-pink-500" : "bg-red-100 text-red-700"}>2</Badge>
-                        </Link>
-                      </motion.div>
-                      
-                      <motion.div variants={mobileMenuItemVariants} whileHover={{ x: 5 }} className="mt-3">
-                        <button
-                          onClick={handleSignOut}
-                          className={`flex items-center w-full text-left px-3 py-3 text-base font-medium rounded-md ${
-                            isDarkMode ? 'text-pink-500 hover:bg-gray-900/50' : 'text-red-600 hover:text-red-700 hover:bg-red-50/50'
-                          } transition-all duration-200`}
-                        >
-                          <LogOut size={18} className="mr-2" />
-                          Sign Out
-                        </button>
-                      </motion.div>
-                    </>
-                  ) : (
-                    <div className="flex flex-col space-y-3 py-3 px-2">
-                      <motion.div variants={mobileMenuItemVariants}>
-                        <Button 
-                          asChild 
-                          variant="outline" 
-                          className={`w-full ${isDarkMode ? 'border-gray-800 text-gray-300 hover:border-pink-500/50 hover:text-pink-500 hover:bg-transparent' : ''}`}
-                        >
-                          <Link href="/auth/signin">
-                            Sign In
-                          </Link>
-                        </Button>
-                      </motion.div>
-                      <motion.div variants={mobileMenuItemVariants}>
-                        <Button 
-                          asChild 
-                          className={`w-full ${isDarkMode ? 'bg-gradient-to-r from-pink-500 to-purple-600 hover:from-pink-600 hover:to-purple-700 text-white border-0' : ''}`}
-                        >
-                          <Link href="/auth/signup">
-                            Sign Up
-                          </Link>
-                        </Button>
-                      </motion.div>
-                    </div>
-                  )}
-                  
-                  {/* Theme Toggle in Mobile */}
-                  <motion.div variants={mobileMenuItemVariants} className="mt-4 pt-4 border-t border-gray-800">
-                    <button
-                      onClick={toggleDarkMode}
-                      className={`flex items-center w-full px-3 py-3 text-base font-medium rounded-md ${
-                        isDarkMode ? 'text-gray-300 hover:text-pink-500 hover:bg-gray-900/50' : 'text-gray-700 hover:text-indigo-700 hover:bg-indigo-50/50'
-                      } transition-all duration-200`}
-                    >
-                      {isDarkMode ? (
-                        <>
-                          <Sun size={18} className="mr-3 text-pink-500" />
-                          <span>Light Mode</span>
-                        </>
-                      ) : (
-                        <>
-                          <Moon size={18} className="mr-3" />
-                          <span>Dark Mode</span>
-                        </>
-                      )}
-                    </button>
-                  </motion.div>
-                </div>
-              </nav>
+              ))}
             </div>
           </motion.div>
         )}
