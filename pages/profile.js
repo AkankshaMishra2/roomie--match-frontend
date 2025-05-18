@@ -4,6 +4,7 @@ import { doc, getDoc, updateDoc } from 'firebase/firestore';
 import { db } from '../lib/firebase';
 import { useRouter } from 'next/router';
 import { getStorage, ref, uploadBytes, getDownloadURL } from 'firebase/storage';
+import { HOSTELS, getHostelDisplay } from '../src/constants/hostels';
 
 export default function ProfilePage() {
   const { user } = useAuth();
@@ -15,7 +16,8 @@ export default function ProfilePage() {
     gender: '',
     age: '',
     occupation: '',
-    preferences: { budget: '', moveInDate: '' }
+    hostel: '',
+    preferences: { moveInDate: '' }
   });
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -39,8 +41,8 @@ export default function ProfilePage() {
             gender: data.gender || '',
             age: data.age || '',
             occupation: data.occupation || '',
+            hostel: data.hostel || '',
             preferences: {
-              budget: data.preferences?.budget || '',
               moveInDate: data.moveInDate || ''
             }
           });
@@ -51,8 +53,8 @@ export default function ProfilePage() {
             gender: data.gender || '',
             age: data.age || '',
             occupation: data.occupation || '',
+            hostel: data.hostel || '',
             preferences: {
-              budget: data.preferences?.budget || '',
               moveInDate: data.moveInDate || ''
             }
           });
@@ -95,6 +97,7 @@ export default function ProfilePage() {
         gender: form.gender,
         age: form.age,
         occupation: form.occupation,
+        hostel: form.hostel,
         preferences: {
           ...form.preferences
         },
@@ -185,9 +188,9 @@ export default function ProfilePage() {
                 className="w-full bg-gray-800 border border-gray-700 rounded-lg px-4 py-2 text-gray-200 focus:outline-none focus:ring-2 focus:ring-pink-500"
               >
                 <option value="">Select</option>
-                <option value="Male">Male</option>
-                <option value="Female">Female</option>
-                <option value="Other">Other</option>
+                <option value="male">Male</option>
+                <option value="female">Female</option>
+                <option value="other">Other</option>
               </select>
             </div>
             <div>
@@ -203,6 +206,39 @@ export default function ProfilePage() {
               />
             </div>
             <div>
+              <label className="block text-pink-200 mb-1">Hostel</label>
+              <select
+                name="hostel"
+                value={form.hostel}
+                onChange={handleChange}
+                className="w-full bg-gray-800 border border-gray-700 rounded-lg px-4 py-2 text-gray-200 focus:outline-none focus:ring-2 focus:ring-pink-500"
+              >
+                <option value="">Select your hostel</option>
+                {form.gender === 'male' && (
+                  <>
+                    <optgroup label="🏳️‍♂️ BOYS HOSTELS">
+                      {HOSTELS.BOYS.map((hostel) => (
+                        <option key={hostel.code} value={hostel.code}>
+                          {hostel.name} ({hostel.code})
+                        </option>
+                      ))}
+                    </optgroup>
+                  </>
+                )}
+                {form.gender === 'female' && (
+                  <>
+                    <optgroup label="🏳️‍♀️ GIRLS HOSTELS">
+                      {HOSTELS.GIRLS.map((hostel) => (
+                        <option key={hostel.code} value={hostel.code}>
+                          {hostel.name} ({hostel.code})
+                        </option>
+                      ))}
+                    </optgroup>
+                  </>
+                )}
+              </select>
+            </div>
+            <div>
               <label className="block text-pink-200 mb-1">Occupation</label>
               <input
                 type="text"
@@ -210,17 +246,6 @@ export default function ProfilePage() {
                 value={form.occupation}
                 onChange={handleChange}
                 className="w-full bg-gray-800 border border-gray-700 rounded-lg px-4 py-2 text-gray-200 focus:outline-none focus:ring-2 focus:ring-pink-500"
-              />
-            </div>
-            <div>
-              <label className="block text-pink-200 mb-1">Budget</label>
-              <input
-                type="number"
-                name="preferences.budget"
-                value={form.preferences.budget}
-                onChange={handleChange}
-                className="w-full bg-gray-800 border border-gray-700 rounded-lg px-4 py-2 text-gray-200 focus:outline-none focus:ring-2 focus:ring-pink-500"
-                min="0"
               />
             </div>
             <div>

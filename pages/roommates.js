@@ -12,7 +12,6 @@ const FindRoommates = () => {
   const { user, loading } = useAuth();
   const router = useRouter();
   const [filters, setFilters] = useState({});
-  const [showFilters, setShowFilters] = useState(false);
   const [formSubmitted, setFormSubmitted] = useState(false);
   const [showThisOrThat, setShowThisOrThat] = useState(false);
 
@@ -66,31 +65,7 @@ const FindRoommates = () => {
                 </svg>
                 Update Preferences
               </button>
-              
-              <button
-                onClick={() => setShowFilters(!showFilters)}
-                className="flex items-center px-8 py-4 bg-gradient-to-r from-purple-600 to-blue-500 rounded-xl text-white hover:from-purple-700 hover:to-blue-600 transition-all duration-300 shadow-lg hover:shadow-purple-500/30"
-              >
-                <svg 
-                  xmlns="http://www.w3.org/2000/svg" 
-                  className="h-5 w-5 mr-2" 
-                  fill="none" 
-                  viewBox="0 0 24 24" 
-                  stroke="currentColor"
-                >
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z" />
-                </svg>
-                {showFilters ? 'Hide Filters' : 'Show Filters'}
-              </button>
             </div>
-            
-            {/* Filters Section */}
-            {showFilters && (
-              <div className="bg-gray-900 rounded-2xl shadow-xl p-8 mb-16 transition-all duration-300 border border-gray-800 backdrop-blur-sm bg-opacity-80">
-                <h2 className="text-2xl font-semibold text-white mb-6 text-transparent bg-clip-text bg-gradient-to-r from-pink-400 to-purple-400">Filter Roommates</h2>
-                <RoommateFilters onFilterChange={handleFilterChange} />
-              </div>
-            )}
             
             {/* Roommate List */}
             <div className="bg-gray-900 rounded-2xl shadow-xl p-8 border border-gray-800 backdrop-blur-sm bg-opacity-80">

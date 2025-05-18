@@ -214,17 +214,17 @@ const RoommateCard = ({ roommate }) => {
         </div>
         
         {/* Quick Info */}
-        <div className="grid grid-cols-2 gap-2 mb-6">
+        <div className="grid grid-cols-1 gap-2 mb-6">
           <div className="bg-gray-50 p-2 rounded text-center">
             <div className="text-xs text-gray-500">Move-in</div>
             <div className="text-sm font-medium">{formattedMoveInDate}</div>
           </div>
-          <div className="bg-gray-50 p-2 rounded text-center">
-            <div className="text-xs text-gray-500">Budget</div>
-            <div className="text-sm font-medium">
-              {preferences.budget ? `$${preferences.budget}` : 'Not specified'}
+          {roommate.hostel && (
+            <div className="bg-gray-50 p-2 rounded text-center">
+              <div className="text-xs text-gray-500">Hostel</div>
+              <div className="text-sm font-medium">{roommate.hostel}</div>
             </div>
-          </div>
+          )}
         </div>
 
         {/* Action Buttons */}

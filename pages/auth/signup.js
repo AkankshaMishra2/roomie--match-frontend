@@ -5,6 +5,7 @@ import Head from 'next/head';
 import Link from 'next/link';
 import { motion } from 'framer-motion';
 import { useAuth } from '../../hooks/useAuth';
+import { HOSTELS } from '../../src/constants/hostels';
 
 export default function SignUp() {
   const [formData, setFormData] = useState({
@@ -15,6 +16,7 @@ export default function SignUp() {
     age: '',
     gender: '',
     university: '',
+    hostel: '',
   });
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
@@ -52,6 +54,7 @@ export default function SignUp() {
         age: formData.age ? parseInt(formData.age) : null,
         gender: formData.gender,
         university: formData.university,
+        hostel: formData.hostel,
         createdAt: new Date().toISOString()
       };
   
@@ -253,6 +256,46 @@ export default function SignUp() {
                     value={formData.university}
                     onChange={handleChange}
                   />
+                </div>
+              </div>
+
+              <div>
+                <label htmlFor="hostel" className="block text-sm font-medium text-gray-200">
+                  Hostel
+                </label>
+                <div className="mt-1">
+                  <select
+                    id="hostel"
+                    name="hostel"
+                    required
+                    className="w-full px-4 py-3 bg-gray-800 border border-gray-700 rounded-lg focus:ring-2 focus:ring-pink-500 focus:border-transparent text-gray-100 transition-all duration-300"
+                    value={formData.hostel}
+                    onChange={handleChange}
+                  >
+                    <option value="">Select your hostel</option>
+                    {formData.gender === 'male' && (
+                      <>
+                        <optgroup label="🏳️‍♂️ BOYS HOSTELS">
+                          {HOSTELS.BOYS.map((hostel) => (
+                            <option key={hostel.code} value={hostel.code}>
+                              {hostel.name} ({hostel.code})
+                            </option>
+                          ))}
+                        </optgroup>
+                      </>
+                    )}
+                    {formData.gender === 'female' && (
+                      <>
+                        <optgroup label="🏳️‍♀️ GIRLS HOSTELS">
+                          {HOSTELS.GIRLS.map((hostel) => (
+                            <option key={hostel.code} value={hostel.code}>
+                              {hostel.name} ({hostel.code})
+                            </option>
+                          ))}
+                        </optgroup>
+                      </>
+                    )}
+                  </select>
                 </div>
               </div>
 
