@@ -16,7 +16,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Badge } from "@/components/ui/badge";
 import { useAuth } from '@/hooks/useAuth';
-import { collection, query, where, onSnapshot, getDocs } from 'firebase/firestore';
+import { collection, query, where, onSnapshot, getDocs, doc, updateDoc, getDoc } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { useChat } from '../../contexts/ChatContext';
 import { useNotifications } from '../../contexts/NotificationContext';
@@ -249,6 +249,16 @@ export default function Navbar() {
     return isActive ? 'text-pink-500' : 'text-gray-300 hover:text-pink-500';
   };
 
+  // Mark a single notification as read
+  const dismissNotification = async (notifId) => {
+    if (!user) return;
+    const notifRef = doc(db, 'roomie-users', user.uid, 'notifications', notifId);
+    const notifSnap = await getDoc(notifRef);
+    if (notifSnap.exists()) {
+      await updateDoc(notifRef, { read: true });
+    }
+  };
+
   return (
     <motion.header 
       className={`fixed w-full z-50 transition-all duration-300 ${getNavbarBg()}`}
@@ -317,14 +327,45 @@ export default function Navbar() {
                 </motion.div>
 
                 <motion.div variants={buttonVariants} whileHover="hover" whileTap="tap" className="relative">
-                  <Button variant="ghost" size="icon" className="relative" onClick={markAllNotificationsAsRead}>
-                    <Bell className="h-5 w-5" />
-                    {unreadNotificationCount > 0 && (
-                      <Badge className="absolute -top-1 -right-1 h-4 w-4 p-0 flex items-center justify-center bg-pink-500">
-                        {unreadNotificationCount}
-                      </Badge>
+                  <div className="relative inline-block">
+                    <Button variant="ghost" size="icon" className="relative" onClick={() => { setNotificationsOpen(v => !v); if (!notificationsOpen) markAllNotificationsAsRead(); }}>
+                      <Bell className="h-5 w-5" />
+                      {unreadNotificationCount > 0 && (
+                        <Badge className="absolute -top-1 -right-1 h-4 w-4 p-0 flex items-center justify-center bg-pink-500">
+                          {unreadNotificationCount}
+                        </Badge>
+                      )}
+                    </Button>
+                    {notificationsOpen && (
+                      <div className="absolute right-0 mt-2 w-80 bg-gray-900 border border-pink-700/30 rounded-xl shadow-lg z-50">
+                        <div className="p-4">
+                          <h4 className="text-lg font-bold text-pink-400 mb-2">Notifications</h4>
+                          {notifications.length === 0 ? (
+                            <div className="text-gray-400 text-center py-4">No notifications.</div>
+                          ) : (
+                            notifications
+                              .sort((a, b) => (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0))
+                              .map(n => (
+                                <div key={n.id} className="border border-gray-800 rounded-lg p-3 mb-2 bg-gray-800/70 relative">
+                                  <button
+                                    className="absolute top-2 right-2 text-gray-400 hover:text-pink-400 text-lg font-bold"
+                                    onClick={() => dismissNotification(n.id)}
+                                    aria-label="Dismiss notification"
+                                  >
+                                    ×
+                                  </button>
+                                  <div className="font-medium text-gray-200">{n.senderName || 'Anonymous'}</div>
+                                  <div className="text-sm text-gray-400">{n.message}</div>
+                                  <div className="text-xs text-gray-500 mt-1">
+                                    {n.createdAt?.seconds ? new Date(n.createdAt.seconds * 1000).toLocaleString() : ''}
+                                  </div>
+                                </div>
+                              ))
+                          )}
+                        </div>
+                      </div>
                     )}
-                  </Button>
+                  </div>
                 </motion.div>
 
                 <DropdownMenu>

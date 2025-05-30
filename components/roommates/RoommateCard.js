@@ -4,7 +4,7 @@ import Image from 'next/image';
 import { useRouter } from 'next/router';
 import { useChat } from '../../contexts/ChatContext';
 import { useAuth } from '../../hooks/useAuth';
-import { doc, getDoc, setDoc, updateDoc, increment } from 'firebase/firestore';
+import { doc, getDoc, setDoc, updateDoc, increment, collection } from 'firebase/firestore';
 import { db } from '../../lib/firebase';
 
 const RoommateCard = ({ roommate }) => {
@@ -53,6 +53,16 @@ const RoommateCard = ({ roommate }) => {
     }
     setRequestLoading(true);
     try {
+      // Get sender's user data
+      const senderDoc = await getDoc(doc(db, 'roomie-users', user.uid));
+      const senderData = senderDoc.exists() ? senderDoc.data() : null;
+      const senderName =
+        senderData?.name ||
+        user.displayName ||
+        user.email?.split('@')[0] ||
+        'Anonymous';
+
+      console.log('Sending match request with senderName:', senderName);
       // Post match request to receiver's subcollection
       const requestRef = doc(db, 'roomie-users', roommate.id, 'match-requests', user.uid);
       await setDoc(requestRef, {
@@ -60,16 +70,32 @@ const RoommateCard = ({ roommate }) => {
         receiverId: roommate.id,
         status: 'pending',
         createdAt: new Date(),
-        senderName: user.displayName || 'Anonymous',
+        senderName: senderName,
         receiverName: roommate.name
       });
-      // Update dashboard stats as before
+
+      // Create notification for receiver
+      const notificationObj = {
+        type: 'match-request',
+        senderId: user.uid,
+        senderName: senderName,
+        message: `${senderName} sent you a match request`,
+        read: false,
+        createdAt: new Date()
+      };
+      console.log('Notification object being created:', notificationObj);
+      const notificationRef = doc(collection(db, 'roomie-users', roommate.id, 'notifications'));
+      await setDoc(notificationRef, notificationObj);
+      console.log('Notification created for receiver:', roommate.id);
+
+      // Update dashboard stats
       const senderStatsRef = doc(db, 'dashboard-stats', user.uid);
       const senderStatsSnap = await getDoc(senderStatsRef);
       const senderStats = senderStatsSnap.exists() ? senderStatsSnap.data() : { matchRequests: 0, activeMatches: 0, messageCount: 0 };
       const receiverStatsRef = doc(db, 'dashboard-stats', roommate.id);
       const receiverStatsSnap = await getDoc(receiverStatsRef);
       const receiverStats = receiverStatsSnap.exists() ? receiverStatsSnap.data() : { matchRequests: 0, activeMatches: 0, messageCount: 0 };
+      
       await setDoc(senderStatsRef, {
         ...senderStats,
         matchRequests: (senderStats.matchRequests || 0) + 1

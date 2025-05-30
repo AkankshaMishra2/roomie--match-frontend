@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '../../hooks/useAuth';
-import { doc, collection, query, where, onSnapshot, updateDoc, getDoc, setDoc } from 'firebase/firestore';
+import { doc, collection, query, where, onSnapshot, updateDoc, getDoc, setDoc, getDocs } from 'firebase/firestore';
 import { db } from '../../lib/firebase';
 
 const MatchRequestsModal = ({ isOpen, onClose }) => {
@@ -16,10 +16,31 @@ const MatchRequestsModal = ({ isOpen, onClose }) => {
       collection(db, 'roomie-users', user.uid, 'match-requests'),
       where('status', '==', 'pending')
     );
-    const unsubscribe = onSnapshot(requestsQuery, (snapshot) => {
-      const requestsData = snapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data()
+    const unsubscribe = onSnapshot(requestsQuery, async (snapshot) => {
+      const requestsData = await Promise.all(snapshot.docs.map(async doc => {
+        const request = doc.data();
+        // Get sender's data if not already included
+        let senderName = request.senderName;
+        if (!senderName) {
+          try {
+            const senderDoc = await getDoc(doc(db, 'roomie-users', request.senderId));
+            if (senderDoc.exists()) {
+              const senderData = senderDoc.data();
+              senderName =
+                senderData.name ||
+                senderData.displayName ||
+                senderData.email?.split('@')[0] ||
+                'Anonymous';
+            }
+          } catch (error) {
+            console.error('Error fetching sender data:', error);
+          }
+        }
+        return {
+          id: doc.id,
+          ...request,
+          senderName: senderName || 'Anonymous'
+        };
       }));
       setRequests(requestsData);
       setLoading(false);
@@ -31,15 +52,8 @@ const MatchRequestsModal = ({ isOpen, onClose }) => {
     const unsubscribeAccepted = onSnapshot(acceptedQuery, async (snapshot) => {
       const matchesData = await Promise.all(snapshot.docs.map(async docSnap => {
         const match = docSnap.data();
-        // Try to get compatibility score if available
-        let compatibility = null;
         let matchedUserName = '';
         try {
-          const compatDoc = await getDoc(doc(db, 'compatibility', `${user.uid}_${match.userId}`));
-          if (compatDoc.exists()) {
-            compatibility = compatDoc.data().score;
-          }
-          // Fetch matched user's name
           const matchedUserDoc = await getDoc(doc(db, 'roomie-users', match.userId));
           if (matchedUserDoc.exists()) {
             matchedUserName = matchedUserDoc.data().name || match.userId;
@@ -50,7 +64,6 @@ const MatchRequestsModal = ({ isOpen, onClose }) => {
         return {
           id: docSnap.id,
           ...match,
-          compatibility,
           matchedUserName
         };
       }));
@@ -64,9 +77,23 @@ const MatchRequestsModal = ({ isOpen, onClose }) => {
 
   const handleRequest = async (requestId, action) => {
     try {
+      const request = requests.find(r => r.id === requestId);
+      if (!request) return;
+
       // Update the request in the user's subcollection
       const requestRef = doc(db, 'roomie-users', user.uid, 'match-requests', requestId);
-      const request = requests.find(r => r.id === requestId);
+      
+      // Mark the corresponding notification as read
+      const notifQuery = query(
+        collection(db, 'roomie-users', user.uid, 'notifications'),
+        where('type', '==', 'match-request'),
+        where('senderId', '==', request.senderId)
+      );
+      const notifSnapshot = await getDocs(notifQuery);
+      for (const notifDoc of notifSnapshot.docs) {
+        await updateDoc(notifDoc.ref, { read: true });
+      }
+
       // Get current stats for both users
       const receiverStatsRef = doc(db, 'dashboard-stats', user.uid);
       const senderStatsRef = doc(db, 'dashboard-stats', request.senderId);
@@ -74,11 +101,13 @@ const MatchRequestsModal = ({ isOpen, onClose }) => {
       const senderStatsSnap = await getDoc(senderStatsRef);
       const receiverStats = receiverStatsSnap.exists() ? receiverStatsSnap.data() : { matchRequests: 0, activeMatches: 0, messageCount: 0 };
       const senderStats = senderStatsSnap.exists() ? senderStatsSnap.data() : { matchRequests: 0, activeMatches: 0, messageCount: 0 };
+
       if (action === 'accept') {
         await updateDoc(requestRef, {
           status: 'accepted',
           acceptedAt: new Date()
         });
+
         // Create a match document in both users' matches subcollection
         const matchData = {
           userId: request.senderId,
@@ -87,12 +116,25 @@ const MatchRequestsModal = ({ isOpen, onClose }) => {
         };
         await setDoc(doc(db, 'roomie-users', user.uid, 'matches', request.senderId), matchData);
         await setDoc(doc(db, 'roomie-users', request.senderId, 'matches', user.uid), { ...matchData, userId: user.uid });
+
+        // Create notification for sender
+        const notificationRef = doc(collection(db, 'roomie-users', request.senderId, 'notifications'));
+        await setDoc(notificationRef, {
+          type: 'match-accepted',
+          senderId: user.uid,
+          senderName: user.displayName || 'Anonymous',
+          message: `${user.displayName || 'Someone'} accepted your match request`,
+          read: false,
+          createdAt: new Date()
+        });
+
         // Update receiver's stats (increment activeMatches)
         await setDoc(receiverStatsRef, {
           ...receiverStats,
           activeMatches: (receiverStats.activeMatches || 0) + 1,
           matchRequests: Math.max(0, (receiverStats.matchRequests || 0) - 1)
         }, { merge: true });
+
         // Update sender's stats (increment activeMatches)
         await setDoc(senderStatsRef, {
           ...senderStats,
@@ -104,6 +146,18 @@ const MatchRequestsModal = ({ isOpen, onClose }) => {
           status: 'rejected',
           rejectedAt: new Date()
         });
+
+        // Create notification for sender
+        const notificationRef = doc(collection(db, 'roomie-users', request.senderId, 'notifications'));
+        await setDoc(notificationRef, {
+          type: 'match-rejected',
+          senderId: user.uid,
+          senderName: user.displayName || 'Anonymous',
+          message: `${user.displayName || 'Someone'} rejected your match request`,
+          read: false,
+          createdAt: new Date()
+        });
+
         await setDoc(receiverStatsRef, {
           ...receiverStats,
           matchRequests: Math.max(0, (receiverStats.matchRequests || 0) - 1)
@@ -178,7 +232,7 @@ const MatchRequestsModal = ({ isOpen, onClose }) => {
                   </div>
                   <div className="flex flex-col items-end">
                     <span className="text-pink-400 font-bold text-lg">
-                      {match.compatibility !== null ? `${match.compatibility}%` : '—'}
+                      {typeof match.compatibility === 'number' ? `${match.compatibility}%` : '—'}
                     </span>
                     <span className="text-xs text-gray-400">Compatibility</span>
                   </div>
